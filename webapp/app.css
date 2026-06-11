@@ -1,0 +1,68 @@
+:root {
+  --bg: #0e1116; --panel: #161b22; --panel2: #1c232c; --border: #2a323d;
+  --text: #e6edf3; --muted: #8b949e; --up: #f23645; --down: #2962ff; --accent: #2f81f7;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--text); font-size: 15px;
+  font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--muted); }
+.muted { color: var(--muted); }
+
+.topbar { padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--panel); position: sticky; top: 0; z-index: 5; }
+.topbar .title { font-size: 17px; font-weight: 800; }
+.topbar .sub { font-size: 11px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+.index-bar { display: flex; border-bottom: 1px solid var(--border); background: var(--panel); }
+.idx { flex: 1; padding: 8px 8px; border-right: 1px solid var(--border); }
+.idx:last-child { border-right: none; }
+.idx-name { font-size: 11px; color: var(--muted); }
+.idx-val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.idx-rate { font-size: 11px; font-variant-numeric: tabular-nums; }
+
+.search { position: relative; padding: 10px 14px; }
+.search input {
+  width: 100%; padding: 12px 12px; font-size: 16px; border-radius: 10px;
+  background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+}
+.results { list-style: none; margin: 6px 0 0; padding: 0; position: absolute; left: 14px; right: 14px; z-index: 10;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px; max-height: 50vh; overflow-y: auto; }
+.results:empty { display: none; }
+.results li { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.results li:last-child { border-bottom: none; }
+.results .nm { font-weight: 600; }
+.results .ex { font-size: 11px; color: var(--muted); margin-left: 6px; }
+.results .cd { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.watchlist { list-style: none; margin: 0; padding: 0 0 70px; }
+.w-item { display: flex; align-items: center; gap: 12px; padding: 14px 14px; border-bottom: 1px solid var(--border); }
+.w-info { flex: 1; min-width: 0; }
+.w-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-code { font-size: 11px; color: var(--muted); }
+.w-spark { width: 76px; height: 34px; flex: none; }
+.w-right { text-align: right; min-width: 92px; }
+.w-px { font-weight: 700; font-variant-numeric: tabular-nums; }
+.w-krw { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.w-rate { font-size: 12px; font-variant-numeric: tabular-nums; }
+.w-del { background: none; border: none; color: var(--muted); font-size: 22px; padding: 0 4px; }
+
+.foot { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between;
+  padding: 8px 14px calc(8px + env(safe-area-inset-bottom)); font-size: 11px; color: var(--muted);
+  background: var(--panel); border-top: 1px solid var(--border); }
+
+/* 차트 오버레이 */
+.chart-view { position: fixed; inset: 0; background: var(--bg); z-index: 50; display: none; flex-direction: column;
+  padding-top: env(safe-area-inset-top); }
+.chart-view.show { display: flex; }
+.cv-header { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--panel); }
+.back { background: none; border: none; color: var(--accent); font-size: 16px; padding: 4px 2px; }
+.cv-name { font-size: 16px; font-weight: 700; }
+.cv-pr { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.cv-krw { font-size: 12px; }
+.cv-tabs { display: flex; gap: 8px; padding: 10px 14px; }
+.cv-tabs button { flex: 1; padding: 8px; border-radius: 8px; border: none; background: var(--panel2); color: var(--muted); font-size: 15px; }
+.cv-tabs button.active { background: var(--accent); color: #fff; }
+.chart { flex: 1; min-height: 0; }

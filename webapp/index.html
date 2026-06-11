@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="theme-color" content="#0e1116" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="주식뷰어" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="./app.css" />
+  <title>주식 뷰어</title>
+</head>
+<body>
+  <header class="topbar">
+    <div class="title">주식 뷰어</div>
+    <div class="sub"><span id="clock"></span> · 네이버 시세</div>
+  </header>
+
+  <div class="index-bar" id="indexBar"></div>
+
+  <div class="search">
+    <input id="q" placeholder="종목명/코드 검색 (삼성전자, AAPL...)" autocomplete="off" />
+    <ul id="results" class="results"></ul>
+  </div>
+
+  <ul id="watchlist" class="watchlist"></ul>
+
+  <footer class="foot"><span id="status">시세 대기</span><span class="credit">by Claudio Lim</span></footer>
+
+  <!-- 차트 오버레이 -->
+  <div id="chartView" class="chart-view">
+    <div class="cv-header">
+      <button id="cvBack" class="back">‹ 뒤로</button>
+      <div class="cv-title">
+        <div class="cv-name" id="cvName">-</div>
+        <div class="cv-pr"><span id="cvPrice">-</span> <span id="cvRate" class="rate"></span></div>
+        <div class="cv-krw muted" id="cvKrw"></div>
+      </div>
+    </div>
+    <div class="cv-tabs">
+      <button data-p="D" class="active">일</button>
+      <button data-p="W">주</button>
+      <button data-p="M">월</button>
+    </div>
+    <div id="chart" class="chart"></div>
+  </div>
+
+  <script src="./lib/lightweight-charts.js"></script>
+  <script src="./naver.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
