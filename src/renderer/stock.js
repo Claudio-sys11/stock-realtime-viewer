@@ -145,6 +145,24 @@ document.querySelectorAll('.period-tabs button').forEach((btn) => {
   });
 });
 
+// ---------------- 환율 (미국 종목 원화 환산) ----------------
+let fxRate = null;
+function updateKrw() {
+  const el = $('#krw');
+  if (MARKET === 'US' && fxRate && lastPrice != null) {
+    el.textContent = `≈ ${Math.round(lastPrice * fxRate).toLocaleString('ko-KR')}원`;
+  } else {
+    el.textContent = '';
+  }
+}
+async function loadFx() {
+  const r = await window.api.getUsdKrw();
+  if (r.ok) {
+    fxRate = r.rate;
+    updateKrw();
+  }
+}
+
 // ---------------- 현재가 헤더 (시세 강조) ----------------
 let lastPrice = null;
 function setPrice(price, change, rate) {
@@ -162,6 +180,7 @@ function setPrice(price, change, rate) {
     prEl.classList.add(price > lastPrice ? 'flash-up' : 'flash-down');
   }
   lastPrice = price;
+  updateKrw();
 }
 
 function onTick(price) {
@@ -203,4 +222,8 @@ window.api.onThemeChange((t) => applyTheme(t));
     : await window.api.getQuote(ITEM);
   if (q.ok) setPrice(q.quote.price, q.quote.change, q.quote.changeRate);
   if (!IS_INDEX) await window.api.subscribe(ITEM);
+  if (MARKET === 'US') {
+    loadFx();
+    setInterval(loadFx, 60000);
+  }
 })();

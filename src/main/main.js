@@ -243,6 +243,14 @@ function registerIpc() {
     }
   });
 
+  ipcMain.handle('fx:usdkrw', async () => {
+    try {
+      return { ok: true, rate: await naver.getUsdKrw() };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+
   ipcMain.handle('realtime:subscribe', (_e, item) => {
     subscribe(item);
     return { ok: true };

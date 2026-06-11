@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld('api', {
   // 종목 검색 (이름/코드)
   searchStocks: (query) => ipcRenderer.invoke('stocks:search', query),
 
+  // 환율 (USD→KRW)
+  getUsdKrw: () => ipcRenderer.invoke('fx:usdkrw'),
+
   // 주요 지수 (코스피/나스닥/S&P500)
   getIndices: () => ipcRenderer.invoke('indices:get'),
   getIndexChart: (key, period) => ipcRenderer.invoke('indexChart:get', { key, period }),

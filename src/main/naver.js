@@ -266,6 +266,19 @@ class NaverClient {
       }));
   }
 
+  /** 현재 원/달러 환율 (USD→KRW) */
+  async getUsdKrw() {
+    const url =
+      'https://m.stock.naver.com/front-api/marketIndex/productDetail?category=exchange&reutersCode=FX_USDKRW';
+    const res = await fetch(url, { headers: HEADERS });
+    if (!res.ok) throw new Error(`환율 조회 실패 (${res.status})`);
+    const data = await res.json();
+    const r = data.result || {};
+    const rate = num(r.calcPrice != null ? r.calcPrice : r.closePrice);
+    if (!rate) throw new Error('환율 값을 찾을 수 없습니다.');
+    return rate;
+  }
+
   /** 종목명/코드 검색 */
   async search(query) {
     query = String(query || '').trim();

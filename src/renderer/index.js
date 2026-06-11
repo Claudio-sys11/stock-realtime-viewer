@@ -111,6 +111,7 @@ function renderItem(item) {
     <div class="wi-right">
       <div class="price">
         <div class="px">-</div>
+        <div class="krw"></div>
         <div class="rate flat">-</div>
       </div>
       <button class="del" title="삭제">×</button>
@@ -140,6 +141,25 @@ function renderItem(item) {
   });
 }
 
+// ---- 환율 (미국 종목 원화 환산) ----
+let fxRate = null;
+function setKrw(it, price) {
+  const el = it.el.querySelector('.krw');
+  if (!el) return;
+  if (it.market === 'US' && fxRate && price != null) {
+    el.textContent = `≈ ${Math.round(price * fxRate).toLocaleString('ko-KR')}원`;
+  } else {
+    el.textContent = '';
+  }
+}
+async function loadFx() {
+  const r = await window.api.getUsdKrw();
+  if (r.ok) {
+    fxRate = r.rate;
+    for (const it of items.values()) if (it.market === 'US') setKrw(it, it.lastPrice);
+  }
+}
+
 function flash(el, dir) {
   el.classList.remove('flash-up', 'flash-down');
   // 리플로우로 애니메이션 재시작 보장
@@ -158,6 +178,7 @@ function updatePrice(symbol, price, change, rate) {
   rateEl.className = `rate ${cls}`;
   const sign = change > 0 ? '▲' : change < 0 ? '▼' : '-';
   rateEl.textContent = `${sign} ${fmtPrice(Math.abs(change), it.market)} (${rate}%)`;
+  setKrw(it, price);
 
   // 시세 변경 시 금액 강조 (직전 대비 방향으로 깜빡임)
   if (it.lastPrice != null && price !== it.lastPrice) {
@@ -453,6 +474,8 @@ function updateClock() {
 // ---- 초기화 ----
 updateClock();
 setInterval(updateClock, 1000);
+loadFx();
+setInterval(loadFx, 60000); // 환율 1분마다 갱신
 loadIndexCharts();
 setInterval(loadIndexCharts, 300000); // 5분마다 지수 차트 갱신
 loadIndices();
