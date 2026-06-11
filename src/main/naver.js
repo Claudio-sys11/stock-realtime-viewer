@@ -24,6 +24,16 @@ const INDEX_DEFS = {
 };
 const WORLD_SCT = { D: 'candleDay', W: 'candleWeek', M: 'candleMonth' };
 
+// 종목 식별자 정규화: 문자열(구버전 한국코드) 또는 {symbol,market,apiCode}
+function normalizeItem(item) {
+  if (typeof item === 'string') return { symbol: item, market: 'KR', apiCode: item };
+  return {
+    symbol: item.symbol || item.code,
+    market: item.market === 'US' ? 'US' : 'KR',
+    apiCode: item.apiCode || item.symbol || item.code,
+  };
+}
+
 function num(s) {
   if (s == null) return 0;
   const n = Number(String(s).replace(/[,%\s]/g, ''));
@@ -38,8 +48,11 @@ function yyyymmdd(d) {
 }
 
 class NaverClient {
-  /** 일/주/월봉 차트 */
-  async getDailyChart(symbol, period = 'D') {
+  /** 일/주/월봉 차트 (한국/미국) */
+  async getDailyChart(item, period = 'D') {
+    const { market, apiCode } = normalizeItem(item);
+    if (market === 'US') return this._worldStockChart(apiCode, period);
+
     const tf = TIMEFRAME[period] || 'day';
     const now = new Date();
     const start = new Date(now);
@@ -49,7 +62,7 @@ class NaverClient {
     else start.setFullYear(start.getFullYear() - 20);
 
     const url =
-      `https://api.finance.naver.com/siseJson.naver?symbol=${symbol}` +
+      `https://api.finance.naver.com/siseJson.naver?symbol=${apiCode}` +
       `&requestType=1&startTime=${yyyymmdd(start)}&endTime=${yyyymmdd(now)}&timeframe=${tf}`;
     const res = await fetch(url, { headers: HEADERS });
     if (!res.ok) throw new Error(`차트 조회 실패 (${res.status})`);
@@ -69,6 +82,28 @@ class NaverClient {
       }));
   }
 
+  /** 미국(해외) 종목 차트 — reutersCode 기반 */
+  async _worldStockChart(reutersCode, period = 'D') {
+    const sct = WORLD_SCT[period] || 'candleDay';
+    const url =
+      'https://m.stock.naver.com/front-api/chart/pricesByPeriod' +
+      `?reutersCode=${encodeURIComponent(reutersCode)}&category=exchangeWorld&chartInfoType=item&scriptChartType=${sct}`;
+    const res = await fetch(url, { headers: HEADERS });
+    if (!res.ok) throw new Error(`차트 조회 실패 (${res.status})`);
+    const data = await res.json();
+    const rows = (data.result && data.result.priceInfos) || [];
+    return rows
+      .filter((r) => r.localDate)
+      .map((r) => ({
+        time: this._toIso(r.localDate),
+        open: num(r.openPrice),
+        high: num(r.highPrice),
+        low: num(r.lowPrice),
+        close: num(r.closePrice),
+        volume: num(r.accumulatedTradingVolume),
+      }));
+  }
+
   _parseSiseJson(text) {
     // 네이버 응답은 작은따옴표를 쓰는 JS 배열 → 큰따옴표로 바꿔 JSON 파싱
     try {
@@ -83,37 +118,83 @@ class NaverClient {
     return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
   }
 
-  /** 단일 종목 현재가 (이름 포함) */
-  async getQuote(symbol) {
-    const list = await this.pollMany([symbol]);
-    const o = list[0];
-    if (!o) throw new Error('종목 정보를 찾을 수 없습니다.');
-    return { symbol, name: o.name, price: o.price, change: o.change, changeRate: o.changeRate };
+  /** 폴링 응답 1건 파싱 (도메스틱/해외 동일 스키마) */
+  _parseQuote(x) {
+    const rate = num(x.fluctuationsRatio);
+    const dir =
+      x.compareToPreviousPrice &&
+      (x.compareToPreviousPrice.code === '4' || x.compareToPreviousPrice.code === '5')
+        ? -1
+        : 1;
+    return {
+      name: x.stockName,
+      price: num(x.closePrice),
+      change: num(x.compareToPreviousClosePrice),
+      changeRate: rate !== 0 ? dir * Math.abs(rate) : 0,
+    };
   }
 
-  /** 다중 종목 현재가 (실시간 폴링용) */
-  async pollMany(symbols) {
-    if (!symbols.length) return [];
+  /** 단일 종목 현재가 (한국/미국) */
+  async getQuote(item) {
+    const { symbol, market, apiCode } = normalizeItem(item);
     const url =
-      'https://polling.finance.naver.com/api/realtime/domestic/stock/' +
-      symbols.join(',');
+      market === 'US'
+        ? 'https://polling.finance.naver.com/api/realtime/worldstock/stock/' + encodeURIComponent(apiCode)
+        : 'https://polling.finance.naver.com/api/realtime/domestic/stock/' + apiCode;
     const res = await fetch(url, { headers: HEADERS });
     if (!res.ok) throw new Error(`시세 조회 실패 (${res.status})`);
     const data = await res.json();
-    return (data.datas || []).map((x) => {
-      // 전일대비 부호: compareToPreviousClosePrice에 부호 포함("-7,250")
-      const change = num(x.compareToPreviousClosePrice);
-      const rate = num(x.fluctuationsRatio);
-      // 등락 방향 보정 (간혹 부호가 빠지는 값 대비)
-      const dir = x.compareToPreviousPrice && (x.compareToPreviousPrice.code === '4' || x.compareToPreviousPrice.code === '5') ? -1 : 1;
-      return {
-        symbol: x.itemCode,
-        name: x.stockName,
-        price: num(x.closePrice),
-        change: change !== 0 ? change : 0,
-        changeRate: rate !== 0 ? dir * Math.abs(rate) : 0,
-      };
-    });
+    const x = (data.datas || [])[0];
+    if (!x) throw new Error('종목 정보를 찾을 수 없습니다.');
+    const q = this._parseQuote(x);
+    return { symbol, name: q.name, price: q.price, change: q.change, changeRate: q.changeRate };
+  }
+
+  /** 다중 종목 현재가 (실시간 폴링용) — 한국은 일괄, 미국은 개별 */
+  async pollMany(items) {
+    const list = items.map(normalizeItem);
+    const kr = list.filter((i) => i.market !== 'US');
+    const us = list.filter((i) => i.market === 'US');
+    const out = [];
+
+    if (kr.length) {
+      try {
+        const url =
+          'https://polling.finance.naver.com/api/realtime/domestic/stock/' +
+          kr.map((i) => i.apiCode).join(',');
+        const res = await fetch(url, { headers: HEADERS });
+        if (res.ok) {
+          const data = await res.json();
+          for (const x of data.datas || []) {
+            const q = this._parseQuote(x);
+            out.push({ symbol: x.itemCode, name: q.name, price: q.price, change: q.change, changeRate: q.changeRate });
+          }
+        }
+      } catch (_) {
+        /* 무시 */
+      }
+    }
+
+    await Promise.all(
+      us.map(async (i) => {
+        try {
+          const url =
+            'https://polling.finance.naver.com/api/realtime/worldstock/stock/' +
+            encodeURIComponent(i.apiCode);
+          const res = await fetch(url, { headers: HEADERS });
+          if (!res.ok) return;
+          const data = await res.json();
+          const x = (data.datas || [])[0];
+          if (!x) return;
+          const q = this._parseQuote(x);
+          out.push({ symbol: i.symbol, name: q.name, price: q.price, change: q.change, changeRate: q.changeRate });
+        } catch (_) {
+          /* 무시 */
+        }
+      })
+    );
+
+    return out;
   }
 
   /** 주요 지수 (코스피 / 나스닥 / S&P500) 현재가 일괄 */
@@ -194,9 +275,18 @@ class NaverClient {
     if (!res.ok) throw new Error(`검색 실패 (${res.status})`);
     const data = await res.json();
     return (data.items || [])
-      .filter((it) => it.nationCode === 'KOR' && /^\d{6}$/.test(it.code))
+      .filter(
+        (it) =>
+          (it.nationCode === 'KOR' && /^\d{6}$/.test(it.code)) || it.nationCode === 'USA'
+      )
       .slice(0, 20)
-      .map((it) => ({ code: it.code, name: it.name, market: it.typeName || '' }));
+      .map((it) => ({
+        code: it.code,
+        name: it.name,
+        market: it.nationCode === 'USA' ? 'US' : 'KR',
+        apiCode: it.nationCode === 'USA' ? it.reutersCode : it.code,
+        exchange: it.typeName || '',
+      }));
   }
 }
 

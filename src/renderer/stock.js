@@ -4,17 +4,21 @@ const params = new URLSearchParams(location.search);
 const SYMBOL = params.get('symbol');
 const NAME = params.get('name') || SYMBOL;
 const IS_INDEX = params.get('type') === 'index';
+const MARKET = params.get('market') === 'US' ? 'US' : 'KR';
+const APICODE = params.get('apiCode') || SYMBOL;
+const ITEM = { symbol: SYMBOL, market: MARKET, apiCode: APICODE };
+const DECIMAL = IS_INDEX || MARKET === 'US'; // 지수·미국주식은 소수점 표시
 
 const $ = (s) => document.querySelector(s);
 const fmt = (n) =>
-  IS_INDEX
+  DECIMAL
     ? Number(n).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : Number(n).toLocaleString('ko-KR');
 const cssVar = (name) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 $('#nm').textContent = NAME;
-$('#cd').textContent = IS_INDEX ? '' : ` ${SYMBOL}`;
+$('#cd').textContent = IS_INDEX ? '' : MARKET === 'US' ? ` ${SYMBOL} · 미국` : ` ${SYMBOL}`;
 document.title = IS_INDEX ? NAME : `${NAME} (${SYMBOL})`;
 
 // 네이버 링크: 종목만 Chrome으로 열기 (지수는 숨김)
@@ -22,7 +26,11 @@ if (IS_INDEX) {
   $('#naverLink').style.display = 'none';
 } else {
   $('#naverLink').addEventListener('click', () => {
-    window.api.openExternal(`https://finance.naver.com/item/main.naver?code=${SYMBOL}`);
+    const url =
+      MARKET === 'US'
+        ? `https://m.stock.naver.com/worldstock/stock/${APICODE}/total`
+        : `https://finance.naver.com/item/main.naver?code=${SYMBOL}`;
+    window.api.openExternal(url);
   });
 }
 
@@ -105,7 +113,7 @@ function drawLevelLines(candles) {
 async function loadChart(period) {
   const res = IS_INDEX
     ? await window.api.getIndexChart(SYMBOL, period)
-    : await window.api.getDailyChart(SYMBOL, period);
+    : await window.api.getDailyChart(ITEM, period);
   if (!res.ok) {
     console.error(res.error);
     return;
@@ -192,7 +200,7 @@ window.api.onThemeChange((t) => applyTheme(t));
   await loadChart('D');
   const q = IS_INDEX
     ? await window.api.getIndexQuote(SYMBOL)
-    : await window.api.getQuote(SYMBOL);
+    : await window.api.getQuote(ITEM);
   if (q.ok) setPrice(q.quote.price, q.quote.change, q.quote.changeRate);
-  if (!IS_INDEX) await window.api.subscribe(SYMBOL);
+  if (!IS_INDEX) await window.api.subscribe(ITEM);
 })();

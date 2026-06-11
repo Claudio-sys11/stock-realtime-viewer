@@ -18,8 +18,9 @@ let mainWindow = null;
 // 종목별로 열린 차트 창: symbol → BrowserWindow
 const stockWindows = new Map();
 
-// 실시간 폴링 구독: symbol → 참조 수
+// 실시간 폴링 구독: symbol → 참조 수, symbol → {market, apiCode}
 const subs = new Map();
+const subInfo = new Map();
 let pollTimer = null;
 const POLL_INTERVAL = 4000; // ms
 
@@ -44,7 +45,7 @@ function createMainWindow() {
 }
 
 /** 종목/지수 차트 창 열기 (이미 있으면 포커스) */
-function openStockWindow(symbol, name, type) {
+function openStockWindow(symbol, name, type, market, apiCode) {
   if (stockWindows.has(symbol)) {
     const w = stockWindows.get(symbol);
     if (!w.isDestroyed()) {
@@ -68,6 +69,8 @@ function openStockWindow(symbol, name, type) {
   url.searchParams.set('symbol', symbol);
   url.searchParams.set('name', name || symbol);
   url.searchParams.set('type', type === 'index' ? 'index' : 'stock');
+  url.searchParams.set('market', market === 'US' ? 'US' : 'KR');
+  url.searchParams.set('apiCode', apiCode || symbol);
   win.loadURL(url.toString());
   if (isDev) win.webContents.openDevTools({ mode: 'detach' });
 
@@ -97,15 +100,21 @@ function sendStatus(status, detail) {
 
 // ---------------- 실시간 폴링 ----------------
 
-function subscribe(symbol) {
-  subs.set(symbol, (subs.get(symbol) || 0) + 1);
+function subscribe(item) {
+  const it = typeof item === 'string' ? { symbol: item, market: 'KR', apiCode: item } : item;
+  subs.set(it.symbol, (subs.get(it.symbol) || 0) + 1);
+  subInfo.set(it.symbol, { market: it.market || 'KR', apiCode: it.apiCode || it.symbol });
   startPolling();
 }
 
 function unsubscribe(symbol) {
   const cur = subs.get(symbol) || 0;
-  if (cur <= 1) subs.delete(symbol);
-  else subs.set(symbol, cur - 1);
+  if (cur <= 1) {
+    subs.delete(symbol);
+    subInfo.delete(symbol);
+  } else {
+    subs.set(symbol, cur - 1);
+  }
   if (subs.size === 0) stopPolling();
 }
 
@@ -127,8 +136,9 @@ async function pollTick() {
     stopPolling();
     return;
   }
+  const items = symbols.map((s) => ({ symbol: s, ...(subInfo.get(s) || { market: 'KR', apiCode: s }) }));
   try {
-    const list = await naver.pollMany(symbols);
+    const list = await naver.pollMany(items);
     for (const d of list) {
       routeRealtime(d.symbol, {
         price: d.price,
@@ -147,15 +157,28 @@ async function pollTick() {
 function registerIpc() {
   ipcMain.handle('watchlist:get', () => store.getWatchlist());
 
-  ipcMain.handle('watchlist:add', async (_e, symbol) => {
-    symbol = String(symbol).trim();
-    if (!/^\d{6}$/.test(symbol)) {
-      return { ok: false, error: '종목코드는 6자리 숫자입니다.' };
+  ipcMain.handle('watchlist:add', async (_e, input) => {
+    // input: 6자리 문자열(한국) 또는 {code/symbol, name, market, apiCode}
+    let item;
+    if (typeof input === 'string') {
+      const symbol = input.trim();
+      if (!/^\d{6}$/.test(symbol)) {
+        return { ok: false, error: '종목코드는 6자리 숫자이거나 검색해서 선택해야 합니다.' };
+      }
+      item = { symbol, market: 'KR', apiCode: symbol };
+    } else {
+      item = {
+        symbol: input.symbol || input.code,
+        name: input.name,
+        market: input.market === 'US' ? 'US' : 'KR',
+        apiCode: input.apiCode || input.symbol || input.code,
+      };
     }
     try {
-      const quote = await naver.getQuote(symbol);
-      store.addToWatchlist({ symbol, name: quote.name });
-      return { ok: true, item: { symbol, name: quote.name }, quote };
+      const quote = await naver.getQuote(item);
+      const saved = { symbol: item.symbol, name: item.name || quote.name, market: item.market, apiCode: item.apiCode };
+      store.addToWatchlist(saved);
+      return { ok: true, item: saved, quote };
     } catch (e) {
       return { ok: false, error: e.message };
     }
@@ -166,23 +189,23 @@ function registerIpc() {
     return { ok: true };
   });
 
-  ipcMain.handle('window:openStock', (_e, { symbol, name, type }) => {
-    openStockWindow(symbol, name, type);
+  ipcMain.handle('window:openStock', (_e, { symbol, name, type, market, apiCode }) => {
+    openStockWindow(symbol, name, type, market, apiCode);
     return { ok: true };
   });
 
-  ipcMain.handle('chart:daily', async (_e, { symbol, period }) => {
+  ipcMain.handle('chart:daily', async (_e, { symbol, market, apiCode, period }) => {
     try {
-      const candles = await naver.getDailyChart(symbol, period || 'D');
+      const candles = await naver.getDailyChart({ symbol, market, apiCode }, period || 'D');
       return { ok: true, candles };
     } catch (e) {
       return { ok: false, error: e.message };
     }
   });
 
-  ipcMain.handle('quote:get', async (_e, symbol) => {
+  ipcMain.handle('quote:get', async (_e, item) => {
     try {
-      return { ok: true, quote: await naver.getQuote(symbol) };
+      return { ok: true, quote: await naver.getQuote(item) };
     } catch (e) {
       return { ok: false, error: e.message };
     }
@@ -220,8 +243,8 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle('realtime:subscribe', (_e, symbol) => {
-    subscribe(symbol);
+  ipcMain.handle('realtime:subscribe', (_e, item) => {
+    subscribe(item);
     return { ok: true };
   });
 

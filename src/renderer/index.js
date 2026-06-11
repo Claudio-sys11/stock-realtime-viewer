@@ -8,6 +8,12 @@ const items = new Map(); // symbol → {el, spark, closes, lastPrice}
 function fmt(n) {
   return Number(n).toLocaleString('ko-KR');
 }
+function fmtPrice(n, market) {
+  // 미국 종목은 소수점 2자리
+  return market === 'US'
+    ? Number(n).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : Number(n).toLocaleString('ko-KR');
+}
 function colorClass(change) {
   if (change > 0) return 'up';
   if (change < 0) return 'down';
@@ -71,7 +77,7 @@ function renderSparkline(svg, closes, startPrice) {
 async function loadSparkline(symbol) {
   const it = items.get(symbol);
   if (!it) return;
-  const res = await window.api.getDailyChart(symbol, 'D');
+  const res = await window.api.getDailyChart({ symbol, market: it.market, apiCode: it.apiCode }, 'D');
   if (!res.ok || !res.candles.length) return;
   const recent = res.candles.slice(-30);
   it.closes = recent.map((c) => c.close);
@@ -79,15 +85,27 @@ async function loadSparkline(symbol) {
   drawSparkline(it);
 }
 
+// 저장된 종목을 {symbol, market, apiCode}로 정규화
+function asItem(o) {
+  return {
+    symbol: o.symbol,
+    market: o.market === 'US' ? 'US' : 'KR',
+    apiCode: o.apiCode || o.symbol,
+  };
+}
+
 // ---- 관심종목 ----
 function renderItem(item) {
+  const market = item.market === 'US' ? 'US' : 'KR';
+  const apiCode = item.apiCode || item.symbol;
+  const codeLabel = market === 'US' ? `${item.symbol} · 미국` : item.symbol;
   const li = document.createElement('li');
   li.className = 'watch-item';
   li.dataset.symbol = item.symbol;
   li.innerHTML = `
     <div class="wi-info">
       <div class="name">${item.name}</div>
-      <div class="code">${item.symbol}</div>
+      <div class="code">${codeLabel}</div>
     </div>
     <svg class="spark" xmlns="http://www.w3.org/2000/svg"></svg>
     <div class="wi-right">
@@ -100,7 +118,7 @@ function renderItem(item) {
 
   li.addEventListener('click', (e) => {
     if (e.target.classList.contains('del')) return;
-    window.api.openStockWindow(item.symbol, item.name);
+    window.api.openStockWindow(item.symbol, item.name, 'stock', market, apiCode);
   });
   li.querySelector('.del').addEventListener('click', async (e) => {
     e.stopPropagation();
@@ -117,6 +135,8 @@ function renderItem(item) {
     closes: null,
     startPrice: null,
     lastPrice: null,
+    market,
+    apiCode,
   });
 }
 
@@ -133,11 +153,11 @@ function updatePrice(symbol, price, change, rate) {
   const pxEl = it.el.querySelector('.px');
   const rateEl = it.el.querySelector('.rate');
   const cls = colorClass(change);
-  pxEl.textContent = fmt(price);
+  pxEl.textContent = fmtPrice(price, it.market);
   pxEl.className = `px ${cls}`;
   rateEl.className = `rate ${cls}`;
   const sign = change > 0 ? '▲' : change < 0 ? '▼' : '-';
-  rateEl.textContent = `${sign} ${fmt(Math.abs(change))} (${rate}%)`;
+  rateEl.textContent = `${sign} ${fmtPrice(Math.abs(change), it.market)} (${rate}%)`;
 
   // 시세 변경 시 금액 강조 (직전 대비 방향으로 깜빡임)
   if (it.lastPrice != null && price !== it.lastPrice) {
@@ -151,8 +171,9 @@ function updatePrice(symbol, price, change, rate) {
   it.lastPrice = price;
 }
 
-async function addSymbol(symbol) {
-  const res = await window.api.addWatch(symbol);
+// input: 검색결과 객체 {code,name,market,apiCode} 또는 6자리 문자열(한국)
+async function addStock(input) {
+  const res = await window.api.addWatch(input);
   if (!res.ok) {
     alert(res.error || '추가 실패');
     return;
@@ -162,7 +183,7 @@ async function addSymbol(symbol) {
     updatePrice(res.item.symbol, res.quote.price, res.quote.change, res.quote.changeRate);
   }
   loadSparkline(res.item.symbol);
-  await window.api.subscribe(res.item.symbol);
+  await window.api.subscribe(asItem(res.item));
   clearSearch();
 }
 
@@ -171,8 +192,8 @@ async function loadWatchlist() {
   for (const item of list) {
     renderItem(item);
     loadSparkline(item.symbol);
-    window.api.subscribe(item.symbol);
-    window.api.getQuote(item.symbol).then((r) => {
+    window.api.subscribe(asItem(item));
+    window.api.getQuote(asItem(item)).then((r) => {
       if (r.ok) updatePrice(item.symbol, r.quote.price, r.quote.change, r.quote.changeRate);
     });
   }
@@ -221,8 +242,8 @@ function renderResults(results) {
   resultsEl.innerHTML = results
     .map(
       (r, i) => `
-    <li class="search-result" data-idx="${i}" data-code="${r.code}">
-      <span><span class="sr-name">${r.name}</span> <span class="sr-meta">${r.market}</span></span>
+    <li class="search-result" data-idx="${i}">
+      <span><span class="sr-name">${r.name}</span> <span class="sr-meta">${r.exchange || ''}</span></span>
       <span class="sr-code">${r.code}</span>
     </li>`
     )
@@ -230,7 +251,7 @@ function renderResults(results) {
   resultsEl.querySelectorAll('.search-result').forEach((li) => {
     li.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      addSymbol(li.dataset.code);
+      addStock(currentResults[Number(li.dataset.idx)]);
     });
   });
 }
@@ -269,9 +290,9 @@ searchInput.addEventListener('keydown', (e) => {
     moveActive(-1);
   } else if (e.key === 'Enter') {
     e.preventDefault();
-    if (activeIdx >= 0 && currentResults[activeIdx]) addSymbol(currentResults[activeIdx].code);
-    else if (/^\d{6}$/.test(searchInput.value.trim())) addSymbol(searchInput.value.trim());
-    else if (currentResults[0]) addSymbol(currentResults[0].code);
+    if (activeIdx >= 0 && currentResults[activeIdx]) addStock(currentResults[activeIdx]);
+    else if (/^\d{6}$/.test(searchInput.value.trim())) addStock(searchInput.value.trim());
+    else if (currentResults[0]) addStock(currentResults[0]);
   } else if (e.key === 'Escape') {
     resultsEl.innerHTML = '';
   }
