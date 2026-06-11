@@ -30,28 +30,40 @@ $('#themeToggle').addEventListener('click', async () => {
 });
 window.api.onThemeChange((t) => applyTheme(t));
 
-// ---- 미니차트 (스파크라인) ----
+// ---- 미니차트 (스파크라인, 시작가 기준 위=빨강/아래=파랑) ----
 function drawSparkline(it) {
   const closes = it.closes;
   const svg = it.spark;
   if (!svg || !closes || closes.length < 2) return;
   const w = 72, h = 30, pad = 3;
-  const min = Math.min(...closes);
-  const max = Math.max(...closes);
+  const base = it.startPrice != null ? it.startPrice : closes[0]; // 시작가 기준선
+  const min = Math.min(base, ...closes);
+  const max = Math.max(base, ...closes);
   const range = max - min || 1;
-  const pts = closes
-    .map((c, i) => {
-      const x = pad + (i / (closes.length - 1)) * (w - pad * 2);
-      const y = pad + (1 - (c - min) / range) * (h - pad * 2);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
-  const up = closes[closes.length - 1] >= closes[0];
-  const stroke = up ? 'var(--up)' : 'var(--down)';
+  const X = (i) => pad + (i / (closes.length - 1)) * (w - pad * 2);
+  const Y = (v) => pad + (1 - (v - min) / range) * (h - pad * 2);
+  const baseY = Y(base);
+  const red = [];
+  const blue = [];
+  for (let i = 0; i < closes.length - 1; i++) {
+    const x0 = X(i), y0 = Y(closes[i]);
+    const x1 = X(i + 1), y1 = Y(closes[i + 1]);
+    const v0 = closes[i], v1 = closes[i + 1];
+    const a0 = v0 >= base, a1 = v1 >= base;
+    if (a0 === a1) {
+      (a0 ? red : blue).push(`M${x0.toFixed(1)},${y0.toFixed(1)}L${x1.toFixed(1)},${y1.toFixed(1)}`);
+    } else {
+      const t = (base - v0) / (v1 - v0);
+      const xc = x0 + (x1 - x0) * t;
+      (a0 ? red : blue).push(`M${x0.toFixed(1)},${y0.toFixed(1)}L${xc.toFixed(1)},${baseY.toFixed(1)}`);
+      (a1 ? red : blue).push(`M${xc.toFixed(1)},${baseY.toFixed(1)}L${x1.toFixed(1)},${y1.toFixed(1)}`);
+    }
+  }
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   svg.innerHTML =
-    `<polyline points="${pts}" fill="none" stroke="${stroke}" ` +
-    `stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    `<line x1="${pad}" y1="${baseY.toFixed(1)}" x2="${w - pad}" y2="${baseY.toFixed(1)}" stroke="var(--border)" stroke-width="0.7" stroke-dasharray="2 2"/>` +
+    `<path d="${red.join('')}" fill="none" stroke="#f23645" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<path d="${blue.join('')}" fill="none" stroke="#2962ff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`;
 }
 
 async function loadSparkline(symbol) {
@@ -59,7 +71,9 @@ async function loadSparkline(symbol) {
   if (!it) return;
   const res = await window.api.getDailyChart(symbol, 'D');
   if (!res.ok || !res.candles.length) return;
-  it.closes = res.candles.slice(-30).map((c) => c.close);
+  const recent = res.candles.slice(-30);
+  it.closes = recent.map((c) => c.close);
+  it.startPrice = recent[recent.length - 1].open; // 오늘 시가
   drawSparkline(it);
 }
 
@@ -99,6 +113,7 @@ function renderItem(item) {
     el: li,
     spark: li.querySelector('.spark'),
     closes: null,
+    startPrice: null,
     lastPrice: null,
   });
 }
@@ -265,9 +280,16 @@ searchInput.addEventListener('blur', () => setTimeout(() => (resultsEl.innerHTML
 // ---- 주요 지수 + 장 운영시간 (상단) ----
 const indexBar = $('#indexBar');
 const MARKET_HOURS = {
-  KOSPI: { tz: 'Asia/Seoul', open: '09:00', close: '15:30' },
-  IXIC: { tz: 'America/New_York', open: '09:30', close: '16:00' },
-  SPX: { tz: 'America/New_York', open: '09:30', close: '16:00' },
+  // 코스피는 KRX(정규장)와 NXT(넥스트레이드, 연장거래)를 따로 표기
+  KOSPI: {
+    tz: 'Asia/Seoul',
+    sessions: [
+      { label: 'KRX', open: '09:00', close: '15:30' },
+      { label: 'NXT', open: '08:00', close: '20:00' },
+    ],
+  },
+  IXIC: { tz: 'America/New_York', sessions: [{ open: '09:30', close: '16:00' }] },
+  SPX: { tz: 'America/New_York', sessions: [{ open: '09:30', close: '16:00' }] },
 };
 let indicesData = [];
 
@@ -298,28 +320,35 @@ function fmtDur(mins) {
   return `${m}분`;
 }
 
-// 지수 셀 아래에 들어갈 장 운영시간 HTML
-function marketHoursHtml(key) {
-  const mh = MARKET_HOURS[key];
-  if (!mh) return '';
-  const nowM = nowMinInTZ(mh.tz);
-  const openM = parseHM(mh.open);
-  const closeM = parseHM(mh.close);
+// 한 세션(KRX/NXT/미국장)의 장 운영시간 HTML
+function sessionHtml(tz, s) {
+  const nowM = nowMinInTZ(tz);
+  const openM = parseHM(s.open);
+  const closeM = parseHM(s.close);
   const beforeOpen = nowM < openM;
+  const lbl = s.label ? `<b>${s.label}</b> ` : '';
   // 시작 전=빨강(up), 시작 후=파랑(down)
   const openCls = beforeOpen ? 'up' : 'down';
   const openTxt = beforeOpen
     ? `시작 전 ${fmtDur(openM - nowM)}`
     : `시작 후 ${fmtDur(nowM - openM)}`;
-  let html = `<span class="im-line"><span class="im-t">장시작 ${mh.open}</span> <span class="${openCls}">${openTxt}</span></span>`;
+  let html = `<span class="im-line">${lbl}<span class="im-t">장시작 ${s.open}</span> <span class="${openCls}">${openTxt}</span></span>`;
   // 시작 전이면 마감 정보 숨김
   if (!beforeOpen) {
     const closeTxt = nowM < closeM
       ? `마감 전 ${fmtDur(closeM - nowM)}`
       : `마감 후 ${fmtDur(nowM - closeM)}`;
-    html += `<span class="im-line"><span class="im-t">마감 ${mh.close}</span> <span class="im-close">${closeTxt}</span></span>`;
+    html += `<span class="im-line">${lbl}<span class="im-t">마감 ${s.close}</span> <span class="im-close">${closeTxt}</span></span>`;
   }
-  return `<span class="idx-mkt">${html}</span>`;
+  return html;
+}
+
+// 지수 셀 아래에 들어갈 장 운영시간 HTML
+function marketHoursHtml(key) {
+  const mh = MARKET_HOURS[key];
+  if (!mh) return '';
+  const inner = mh.sessions.map((s) => sessionHtml(mh.tz, s)).join('');
+  return `<span class="idx-mkt">${inner}</span>`;
 }
 
 function renderIndexBar() {
@@ -353,7 +382,17 @@ indexBar.addEventListener('click', (e) => {
   window.api.openStockWindow(cell.dataset.key, cell.dataset.name, 'index');
 });
 
+// ---- 현재 시간 (한국시간) ----
+function updateClock() {
+  const t = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).format(new Date());
+  $('#clock').textContent = `🇰🇷 ${t}`;
+}
+
 // ---- 초기화 ----
+updateClock();
+setInterval(updateClock, 1000);
 loadIndices();
 setInterval(loadIndices, 20000);
 setInterval(renderIndexBar, 30000); // 경과 시간 갱신
