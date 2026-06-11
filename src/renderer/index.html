@@ -10,9 +10,7 @@
 <body>
   <div class="topbar">
     <strong>관심종목</strong>
-    <div class="row">
-      <button class="ghost" id="btnSettings">⚙ 설정</button>
-    </div>
+    <span class="muted" style="font-size:11px">네이버 시세</span>
   </div>
 
   <div class="search-box">
@@ -25,28 +23,7 @@
   <div class="status">
     <span id="wsDot" class="dot"></span>
     <span id="wsText">대기 중</span>
-    <span id="brokerName" class="muted" style="margin-left:8px"></span>
     <span style="float:right" id="appVersion"></span>
-  </div>
-
-  <!-- 설정 모달 -->
-  <div class="modal-backdrop" id="settingsModal">
-    <div class="modal">
-      <h3>증권사 API 설정</h3>
-      <label>증권사</label>
-      <select id="cfgBroker"></select>
-      <label>앱 키 (App Key)</label>
-      <input id="cfgAppKey" placeholder="앱 키" />
-      <label>앱 시크릿 (App Secret)</label>
-      <input id="cfgAppSecret" type="password" placeholder="앱 시크릿 (저장됨)" />
-      <label class="row" style="margin-top:12px; gap:6px;">
-        <input type="checkbox" id="cfgMock" style="width:auto" /> 모의투자 계좌 사용
-      </label>
-      <div class="actions">
-        <button class="ghost" id="cfgCancel">취소</button>
-        <button id="cfgSave">저장</button>
-      </div>
-    </div>
   </div>
 
   <script src="index.js"></script>

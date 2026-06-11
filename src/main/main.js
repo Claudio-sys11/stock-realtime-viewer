@@ -4,18 +4,22 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
-const { Provider, BROKERS } = require('./provider');
+const { NaverClient } = require('./naver');
 const { Store } = require('./store');
 
 const isDev = process.argv.includes('--dev');
 
 let store;
-let provider;
-let realtime;
+let naver;
 let mainWindow = null;
 
 // 종목별로 열린 차트 창: symbol → BrowserWindow
 const stockWindows = new Map();
+
+// 실시간 폴링 구독: symbol → 참조 수
+const subs = new Map();
+let pollTimer = null;
+const POLL_INTERVAL = 4000; // ms
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -37,7 +41,7 @@ function createMainWindow() {
   });
 }
 
-/** 종목 차트/호가 창 열기 (이미 있으면 포커스) */
+/** 종목 차트 창 열기 (이미 있으면 포커스) */
 function openStockWindow(symbol, name) {
   if (stockWindows.has(symbol)) {
     const w = stockWindows.get(symbol);
@@ -49,8 +53,8 @@ function openStockWindow(symbol, name) {
   }
 
   const win = new BrowserWindow({
-    width: 900,
-    height: 680,
+    width: 880,
+    height: 620,
     title: `${name || symbol} (${symbol})`,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
@@ -67,91 +71,78 @@ function openStockWindow(symbol, name) {
   stockWindows.set(symbol, win);
   win.on('closed', () => {
     stockWindows.delete(symbol);
-    if (realtime) realtime.unsubscribe(symbol);
+    unsubscribe(symbol);
   });
 }
 
-/** 실시간 데이터를 해당 종목 창으로 전달 */
-function routeRealtime(symbol, type, payload) {
+/** 실시간(폴링) 시세를 해당 종목 창 + 메인 창으로 전달 */
+function routeRealtime(symbol, payload) {
   const win = stockWindows.get(symbol);
   if (win && !win.isDestroyed()) {
-    win.webContents.send('realtime', { symbol, type, payload });
+    win.webContents.send('realtime', { symbol, type: 'trade', payload });
   }
-  // 관심종목 리스트의 현재가 갱신용으로 메인 창에도 체결가 전달
-  if (type === 'trade' && mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('realtime', { symbol, type, payload });
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('realtime', { symbol, type: 'trade', payload });
   }
 }
 
-function buildRealtime() {
-  return provider.createRealtime({
-    onData: routeRealtime,
-    onStatus: (status, detail) => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('ws-status', { status, detail });
-      }
-    },
-  });
+function sendStatus(status, detail) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('ws-status', { status, detail });
+  }
 }
 
-function initServices() {
-  store = new Store(app.getPath('userData'));
-  const broker = store.getBroker();
-  provider = new Provider(broker, store.getCreds(broker));
-  realtime = buildRealtime();
+// ---------------- 실시간 폴링 ----------------
+
+function subscribe(symbol) {
+  subs.set(symbol, (subs.get(symbol) || 0) + 1);
+  startPolling();
 }
 
-/** 증권사/자격증명 변경 후 provider·실시간 재구성 + 기존 구독 복구 */
-async function rebuildProvider() {
-  if (realtime) realtime.close();
-  const broker = store.getBroker();
-  provider = new Provider(broker, store.getCreds(broker));
-  realtime = buildRealtime();
-  // 관심종목 + 열린 차트창의 합집합을 새 증권사로 재구독
-  const symbols = new Set([
-    ...store.getWatchlist().map((x) => x.symbol),
-    ...stockWindows.keys(),
-  ]);
-  for (const symbol of symbols) {
-    try {
-      await realtime.subscribe(symbol);
-    } catch (_) {
-      /* 자격증명 미입력 등은 조용히 무시 */
+function unsubscribe(symbol) {
+  const cur = subs.get(symbol) || 0;
+  if (cur <= 1) subs.delete(symbol);
+  else subs.set(symbol, cur - 1);
+  if (subs.size === 0) stopPolling();
+}
+
+function startPolling() {
+  if (pollTimer) return;
+  sendStatus('connecting');
+  pollTick();
+  pollTimer = setInterval(pollTick, POLL_INTERVAL);
+}
+
+function stopPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+async function pollTick() {
+  const symbols = [...subs.keys()];
+  if (!symbols.length) {
+    stopPolling();
+    return;
+  }
+  try {
+    const list = await naver.pollMany(symbols);
+    for (const d of list) {
+      routeRealtime(d.symbol, {
+        price: d.price,
+        change: d.change,
+        changeRate: d.changeRate,
+      });
     }
+    sendStatus('connected');
+  } catch (e) {
+    sendStatus('error', e.message);
   }
 }
 
 // ---------------- IPC 핸들러 ----------------
 
 function registerIpc() {
-  ipcMain.handle('config:get', () => {
-    // 증권사별 자격증명(시크릿은 보유 여부만 노출)
-    const brokers = {};
-    for (const b of BROKERS) {
-      const c = store.getCreds(b.id);
-      brokers[b.id] = { appKey: c.appKey, hasSecret: !!c.appSecret, mock: c.mock };
-    }
-    return {
-      broker: store.getBroker(),
-      brokerList: BROKERS,
-      brokers,
-      watchlist: store.getWatchlist(),
-    };
-  });
-
-  ipcMain.handle('config:setCredentials', async (_e, creds) => {
-    const broker = BROKERS.some((b) => b.id === creds.broker) ? creds.broker : 'kis';
-    // appSecret이 null/undefined면 기존 시크릿 유지
-    const prev = store.getCreds(broker);
-    const appSecret = creds.appSecret == null ? prev.appSecret : creds.appSecret;
-    store.setCredentials(broker, {
-      appKey: creds.appKey,
-      appSecret,
-      mock: creds.mock,
-    });
-    await rebuildProvider();
-    return { ok: true };
-  });
+  ipcMain.handle('watchlist:get', () => store.getWatchlist());
 
   ipcMain.handle('watchlist:add', async (_e, symbol) => {
     symbol = String(symbol).trim();
@@ -159,7 +150,7 @@ function registerIpc() {
       return { ok: false, error: '종목코드는 6자리 숫자입니다.' };
     }
     try {
-      const quote = await provider.getQuote(symbol);
+      const quote = await naver.getQuote(symbol);
       store.addToWatchlist({ symbol, name: quote.name });
       return { ok: true, item: { symbol, name: quote.name }, quote };
     } catch (e) {
@@ -179,7 +170,7 @@ function registerIpc() {
 
   ipcMain.handle('chart:daily', async (_e, { symbol, period }) => {
     try {
-      const candles = await provider.getDailyChart(symbol, period || 'D');
+      const candles = await naver.getDailyChart(symbol, period || 'D');
       return { ok: true, candles };
     } catch (e) {
       return { ok: false, error: e.message };
@@ -188,60 +179,37 @@ function registerIpc() {
 
   ipcMain.handle('quote:get', async (_e, symbol) => {
     try {
-      return { ok: true, quote: await provider.getQuote(symbol) };
+      return { ok: true, quote: await naver.getQuote(symbol) };
     } catch (e) {
       return { ok: false, error: e.message };
     }
-  });
-
-  ipcMain.handle('realtime:subscribe', async (_e, symbol) => {
-    try {
-      await realtime.subscribe(symbol);
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, error: e.message };
-    }
-  });
-
-  ipcMain.handle('realtime:unsubscribe', (_e, symbol) => {
-    realtime.unsubscribe(symbol);
-    return { ok: true };
   });
 
   ipcMain.handle('stocks:search', async (_e, query) => {
     try {
-      return { ok: true, results: await searchStocks(query) };
+      return { ok: true, results: await naver.search(query) };
     } catch (e) {
       return { ok: false, error: e.message };
     }
+  });
+
+  ipcMain.handle('realtime:subscribe', (_e, symbol) => {
+    subscribe(symbol);
+    return { ok: true };
+  });
+
+  ipcMain.handle('realtime:unsubscribe', (_e, symbol) => {
+    unsubscribe(symbol);
+    return { ok: true };
   });
 
   ipcMain.handle('app:version', () => app.getVersion());
 }
 
-/**
- * 종목명/코드 검색 (네이버 종목 자동완성 사용 — 증권사 무관, 실시간 최신).
- * @returns {Promise<Array<{code,name,market}>>}
- */
-async function searchStocks(query) {
-  query = String(query || '').trim();
-  if (!query) return [];
-  const url = `https://ac.stock.naver.com/ac?q=${encodeURIComponent(query)}&target=stock&st=111`;
-  const res = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://finance.naver.com/' },
-  });
-  if (!res.ok) throw new Error(`검색 실패 (${res.status})`);
-  const data = await res.json();
-  return (data.items || [])
-    .filter((it) => it.nationCode === 'KOR' && /^\d{6}$/.test(it.code))
-    .slice(0, 20)
-    .map((it) => ({ code: it.code, name: it.name, market: it.typeName || '' }));
-}
-
 // ---------------- 자동 업데이트 ----------------
 
 function setupAutoUpdater() {
-  if (isDev) return; // 개발 모드에서는 비활성화
+  if (isDev) return;
   autoUpdater.autoDownload = true;
   autoUpdater.on('update-available', (info) => {
     if (mainWindow) mainWindow.webContents.send('update', { type: 'available', info });
@@ -269,7 +237,8 @@ function setupAutoUpdater() {
 // ---------------- 앱 라이프사이클 ----------------
 
 app.whenReady().then(() => {
-  initServices();
+  store = new Store(app.getPath('userData'));
+  naver = new NaverClient();
   registerIpc();
   createMainWindow();
   setupAutoUpdater();
@@ -280,6 +249,6 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (realtime) realtime.close();
+  stopPolling();
   if (process.platform !== 'darwin') app.quit();
 });

@@ -7,14 +7,11 @@ const { contextBridge, ipcRenderer } = require('electron');
  * nodeIntegration 없이 IPC만 통과시킨다.
  */
 contextBridge.exposeInMainWorld('api', {
-  // 설정
-  getConfig: () => ipcRenderer.invoke('config:get'),
-  setCredentials: (creds) => ipcRenderer.invoke('config:setCredentials', creds),
-
   // 종목 검색 (이름/코드)
   searchStocks: (query) => ipcRenderer.invoke('stocks:search', query),
 
   // 관심종목
+  getWatchlist: () => ipcRenderer.invoke('watchlist:get'),
   addWatch: (symbol) => ipcRenderer.invoke('watchlist:add', symbol),
   removeWatch: (symbol) => ipcRenderer.invoke('watchlist:remove', symbol),
 
@@ -27,7 +24,7 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('chart:daily', { symbol, period }),
   getQuote: (symbol) => ipcRenderer.invoke('quote:get', symbol),
 
-  // 실시간
+  // 실시간(폴링)
   subscribe: (symbol) => ipcRenderer.invoke('realtime:subscribe', symbol),
   unsubscribe: (symbol) => ipcRenderer.invoke('realtime:unsubscribe', symbol),
   onRealtime: (cb) => {

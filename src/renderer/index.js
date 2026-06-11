@@ -3,12 +3,11 @@
 const $ = (sel) => document.querySelector(sel);
 
 const watchEl = $('#watchlist');
-const items = new Map(); // symbol → {el, name, prevClose}
+const items = new Map(); // symbol → {el, name}
 
 function fmt(n) {
   return Number(n).toLocaleString('ko-KR');
 }
-
 function colorClass(change) {
   if (change > 0) return 'up';
   if (change < 0) return 'down';
@@ -32,12 +31,10 @@ function renderItem(item) {
       <button class="del" title="삭제">×</button>
     </div>`;
 
-  // 클릭 → 차트 창 열기
   li.addEventListener('click', (e) => {
     if (e.target.classList.contains('del')) return;
     window.api.openStockWindow(item.symbol, item.name);
   });
-  // 삭제
   li.querySelector('.del').addEventListener('click', async (e) => {
     e.stopPropagation();
     await window.api.removeWatch(item.symbol);
@@ -55,10 +52,10 @@ function updatePrice(symbol, price, change, rate) {
   if (!it) return;
   const pxEl = it.el.querySelector('.px');
   const rateEl = it.el.querySelector('.rate');
-  pxEl.textContent = fmt(price);
   const cls = colorClass(change);
-  rateEl.className = `rate ${cls}`;
+  pxEl.textContent = fmt(price);
   pxEl.className = `px ${cls}`;
+  rateEl.className = `rate ${cls}`;
   const sign = change > 0 ? '▲' : change < 0 ? '▼' : '-';
   rateEl.textContent = `${sign} ${fmt(Math.abs(change))} (${rate}%)`;
 }
@@ -69,9 +66,7 @@ async function addSymbol(symbol) {
     alert(res.error || '추가 실패');
     return;
   }
-  if (!items.has(res.item.symbol)) {
-    renderItem(res.item);
-  }
+  if (!items.has(res.item.symbol)) renderItem(res.item);
   if (res.quote) {
     updatePrice(res.item.symbol, res.quote.price, res.quote.change, res.quote.changeRate);
   }
@@ -79,37 +74,28 @@ async function addSymbol(symbol) {
   clearSearch();
 }
 
-function setBrokerBadge(cfg) {
-  const b = cfg.brokerList.find((x) => x.id === cfg.broker);
-  $('#brokerName').textContent = b ? `· ${b.label}` : '';
-}
-
 async function loadWatchlist() {
-  const cfg = await window.api.getConfig();
-  setBrokerBadge(cfg);
-  for (const item of cfg.watchlist) {
+  const list = await window.api.getWatchlist();
+  for (const item of list) {
     renderItem(item);
     window.api.subscribe(item.symbol);
-    // 초기 현재가 1회 조회
     window.api.getQuote(item.symbol).then((r) => {
       if (r.ok) updatePrice(item.symbol, r.quote.price, r.quote.change, r.quote.changeRate);
     });
   }
 }
 
-// ---- 실시간 체결 → 가격 갱신 ----
+// ---- 실시간(폴링) 시세 ----
 window.api.onRealtime(({ symbol, type, payload }) => {
   if (type === 'trade') {
     updatePrice(symbol, payload.price, payload.change, payload.changeRate);
   }
 });
 
-// ---- WebSocket 상태 표시 ----
 const STATUS_TEXT = {
-  connecting: '연결 중...',
-  connected: '실시간 연결됨',
-  disconnected: '연결 끊김',
-  error: '연결 오류',
+  connecting: '시세 불러오는 중...',
+  connected: '시세 갱신 중',
+  error: '시세 오류',
 };
 window.api.onWsStatus(({ status, detail }) => {
   $('#wsDot').className = `dot ${status}`;
@@ -117,60 +103,9 @@ window.api.onWsStatus(({ status, detail }) => {
   if (detail && status === 'error') $('#wsText').textContent += ` (${detail})`;
 });
 
-// ---- 업데이트 알림 ----
 window.api.onUpdate((u) => {
   if (u.type === 'available') $('#wsText').textContent = '새 업데이트 다운로드 중...';
   if (u.type === 'downloaded') $('#wsText').textContent = '업데이트 준비됨 — 재시작 대기';
-});
-
-// ---- 설정 모달 ----
-const modal = $('#settingsModal');
-const brokerSel = $('#cfgBroker');
-let cfgCache = null;
-
-function fillBrokerFields(broker) {
-  const b = (cfgCache && cfgCache.brokers[broker]) || {
-    appKey: '',
-    hasSecret: false,
-    mock: false,
-  };
-  $('#cfgAppKey').value = b.appKey || '';
-  $('#cfgAppSecret').value = b.hasSecret ? '********' : '';
-  $('#cfgMock').checked = !!b.mock;
-}
-
-$('#btnSettings').addEventListener('click', async () => {
-  cfgCache = await window.api.getConfig();
-  // 증권사 목록 채우기
-  brokerSel.innerHTML = cfgCache.brokerList
-    .map((b) => `<option value="${b.id}">${b.label}</option>`)
-    .join('');
-  brokerSel.value = cfgCache.broker;
-  fillBrokerFields(cfgCache.broker);
-  modal.classList.add('show');
-});
-
-// 증권사 바꾸면 해당 증권사의 저장된 키를 표시
-brokerSel.addEventListener('change', () => fillBrokerFields(brokerSel.value));
-
-$('#cfgCancel').addEventListener('click', () => modal.classList.remove('show'));
-$('#cfgSave').addEventListener('click', async () => {
-  const broker = brokerSel.value;
-  const appKey = $('#cfgAppKey').value.trim();
-  const raw = $('#cfgAppSecret').value;
-  // 마스킹('********')을 그대로 두면 시크릿 변경 안 함(null=기존 유지)
-  const appSecret = raw === '********' ? null : raw;
-  await window.api.setCredentials({
-    broker,
-    appKey,
-    appSecret, // null이면 메인에서 기존 시크릿 유지
-    mock: $('#cfgMock').checked,
-  });
-  modal.classList.remove('show');
-  // 배지 갱신
-  cfgCache = await window.api.getConfig();
-  setBrokerBadge(cfgCache);
-  alert(`저장되었습니다. (${brokerSel.options[brokerSel.selectedIndex].text})`);
 });
 
 // ---- 종목 검색 + 선택 ----
@@ -199,7 +134,6 @@ function renderResults(results) {
     </li>`
     )
     .join('');
-  // mousedown으로 처리해 input blur보다 먼저 실행
   resultsEl.querySelectorAll('.search-result').forEach((li) => {
     li.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -250,7 +184,6 @@ searchInput.addEventListener('keydown', (e) => {
   }
 });
 
-// 포커스 잃으면 결과 닫기 (클릭 처리 후)
 searchInput.addEventListener('blur', () => setTimeout(() => (resultsEl.innerHTML = ''), 150));
 
 // ---- 초기화 ----

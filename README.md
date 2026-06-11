@@ -1,108 +1,72 @@
-# StockViewer — 실시간 주식 차트/호가 뷰어
+# 주식 뷰어 (StockViewer)
 
-국내 주식의 **실시간 차트·호가·체결**을 보여주는 Windows 데스크톱 앱입니다.
-**한국투자증권(KIS)** 과 **키움증권(REST API)** 중 골라서 쓸 수 있고,
-관심종목을 클릭하면 **새 창**으로 차트+호가가 열리며, **GitHub Releases로 자동 업데이트**됩니다.
+네이버 금융 시세로 국내 주식의 **차트와 현재가**를 보여주는 Windows 데스크톱 앱입니다.
+**API 키가 필요 없고**, 종목을 검색해 관심종목에 추가하면 **새 창**으로 차트가 열립니다.
+**GitHub Releases로 자동 업데이트**됩니다. 제작: **Claudio Lim**
 
 ## 주요 기능
-- **증권사 선택**: 한국투자증권(KIS) / 키움증권(REST) — 설정에서 전환, 자격증명은 증권사별로 따로 저장
-- 관심종목 리스트 (종목코드 추가/삭제, 실시간 현재가)
-- 종목별 **독립 창**: 캔들 차트(일/주/월) + 10단계 실시간 호가창
-- **WebSocket** 실시간 체결/호가 구독
+- **종목 검색**: 종목명(예: 삼성전자) 또는 코드(예: 005930)로 검색해 선택
+- 관심종목 리스트 + 실시간(폴링) 현재가
+- 종목별 **독립 창**: 캔들 차트(일/주/월) + 거래량 + 현재가
+- API 키 불필요 — 네이버 금융 데이터 사용 (조회 전용)
 - `electron-updater` 기반 자동 업데이트
-- API 키는 로컬 `userData/config.json`에만 저장 (레포에 올라가지 않음)
+
+> ⚠️ 네이버의 비공식 엔드포인트를 사용합니다. 개인용 조회 목적에 한해 쓰세요. 시세는 실시간 대비 약간의 지연이 있을 수 있습니다.
 
 ---
 
-## 1. 사전 준비: 증권사 API 키 발급
-
-원하는 증권사 한 곳(또는 둘 다)에서 키를 발급받으세요.
-
-**한국투자증권 (KIS)**
-1. [KIS Developers](https://apiportal.koreainvestment.com/) 가입 → 계좌 연결 후 **앱 등록**
-2. `App Key` / `App Secret` 발급 (모의투자 신청 시 모의 도메인 사용 가능)
-
-**키움증권 (REST API)**
-1. [키움 OpenAPI(REST)](https://openapi.kiwoom.com/) 가입 → **앱 등록**
-2. `App Key` / `Secret Key` 발급
-3. ⚠️ 옛 OpenAPI+(32bit OCX)가 **아니라** 신규 **REST API** 서비스 신청이 필요합니다.
-
-> ⚠️ 두 증권사 모두 실시간 시세 WebSocket은 계좌/약관 동의가 필요합니다. 발급한 키가 실시간 시세 권한을 포함하는지 확인하세요.
-
-## 2. 개발 모드 실행
+## 개발 모드 실행
 ```powershell
 cd stock-viewer
 npm install
 npm run dev
 ```
-앱 실행 후 우측 상단 **⚙ 설정** → **증권사 선택** → App Key / Secret 입력 → 저장.
-(증권사를 바꾸면 해당 증권사의 저장된 키가 표시되고, 저장 시 그 증권사로 전환됩니다.)
-종목코드 6자리(예: `005930` 삼성전자)를 입력해 추가하고, 항목을 클릭하면 차트 창이 열립니다.
+앱 실행 → 검색창에 **종목명 또는 코드**를 입력 → 결과를 클릭하면 관심종목에 추가됩니다.
+관심종목 항목을 클릭하면 차트 창이 열립니다. (키 입력·설정 없음)
 
-## 3. .exe 빌드
+## .exe 빌드
 ```powershell
 npm run build:win
 ```
-`dist/StockViewer-Setup-1.0.0.exe` 설치 파일이 생성됩니다.
+`dist/StockViewer-Setup-<버전>.exe` 설치 파일이 생성됩니다.
+
+> 로컬 빌드가 winCodeSign 심볼릭 링크 오류로 실패하면, Windows **개발자 모드**를 켜거나(설정 → 개발자용) GitHub Actions(아래)로 빌드하세요.
 
 ---
 
-## 4. GitHub 자동 업데이트 설정 (한 번만)
+## GitHub 자동 빌드·배포
+`.github/workflows/release.yml`이 **버전 태그 푸시 시** Windows 러너에서 `.exe`를 빌드해
+GitHub Releases에 `latest.yml`과 함께 **자동 정식 배포**합니다.
 
-### 4-1. 레포 정보 입력
-`package.json`의 `build.publish` 와 워크플로의 owner/repo를 본인 것으로 바꿉니다.
-```jsonc
-"publish": [
-  { "provider": "github", "owner": "본인깃허브아이디", "repo": "레포이름" }
-]
-```
-
-### 4-2. 레포에 코드 푸시
-```powershell
-git init
-git add .
-git commit -m "init: stock viewer"
-git branch -M main
-git remote add origin https://github.com/본인아이디/레포이름.git
-git push -u origin main
-```
-
-### 4-3. 릴리스 배포 (자동 빌드)
-버전 태그를 푸시하면 `.github/workflows/release.yml`이 Windows에서 빌드 후
-GitHub Releases에 설치 파일과 `latest.yml`을 자동 업로드합니다.
 ```powershell
 # package.json의 version을 올린 뒤
-git commit -am "release: v1.0.1" -m ""
-git tag v1.0.1
-git push origin v1.0.1
+git commit -am "release: vX.Y.Z"
+git tag vX.Y.Z
+git push origin main
+git push origin vX.Y.Z
 ```
-
-### 4-4. 사용자 측 자동 업데이트
-설치된 앱은 실행 시 GitHub Releases의 `latest.yml`을 확인합니다.
-새 버전이 있으면 백그라운드로 내려받고, 완료되면 "지금 재시작" 안내가 뜹니다.
+설치된 앱은 실행 시 `latest.yml`을 확인해 새 버전을 백그라운드로 받고 "지금 재시작"을 안내합니다.
 **개발자는 버전 올리고 태그만 푸시하면 끝**입니다.
-
-> 비공개(private) 레포라면 사용자 측에서 토큰이 필요합니다. 공개 레포 사용을 권장합니다.
 
 ---
 
 ## 디렉터리 구조
 ```
 stock-viewer/
-├─ package.json            # 의존성 + electron-builder 설정
+├─ package.json                # 의존성 + electron-builder 설정
 ├─ src/
 │  ├─ main/
-│  │  ├─ main.js           # 앱/창 관리, IPC, 자동 업데이트
-│  │  ├─ kis.js            # KIS REST(토큰, 차트, 현재가)
-│  │  ├─ ws.js             # KIS WebSocket(호가/체결)
-│  │  └─ store.js          # 설정/관심종목 저장
-│  ├─ preload/preload.js   # 안전한 IPC 브리지
+│  │  ├─ main.js               # 앱/창 관리, 폴링, IPC, 자동 업데이트
+│  │  ├─ naver.js              # 네이버 차트/현재가/검색 클라이언트
+│  │  └─ store.js              # 관심종목 저장
+│  ├─ preload/preload.js       # 안전한 IPC 브리지
 │  └─ renderer/
-│     ├─ index.html/js     # 관심종목 창
-│     └─ stock.html/js     # 차트+호가 창
+│     ├─ index.html/js         # 관심종목 + 검색 창
+│     ├─ stock.html/js         # 차트 창
+│     └─ vendor/lightweight-charts.js   # 차트 라이브러리(내장)
 └─ .github/workflows/release.yml
 ```
 
-## 라이선스 / 주의
+## 주의
 - 본 프로그램은 학습/개인용 예시입니다. 투자 판단의 책임은 사용자에게 있습니다.
-- KIS API 이용약관 및 호출 한도(분당/일별)를 준수하세요.
+- 네이버 시세 데이터의 정확성·가용성은 보장되지 않습니다.

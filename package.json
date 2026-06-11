@@ -1,7 +1,7 @@
 {
   "name": "stock-realtime-viewer",
-  "version": "1.0.3",
-  "description": "실시간 주식 차트/호가 뷰어 (한국투자증권 KIS API)",
+  "version": "1.1.0",
+  "description": "주식 차트/현재가 뷰어 (네이버 금융 데이터)",
   "author": "Claudio Lim",
   "main": "src/main/main.js",
   "scripts": {

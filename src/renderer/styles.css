@@ -123,8 +123,7 @@ input {
 .modal .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
 
 /* ---- 종목 창 (차트+호가) ---- */
-.stock-layout { display: grid; grid-template-columns: 1fr 260px; height: 100vh; }
-.chart-pane { display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+.chart-pane { display: flex; flex-direction: column; height: 100vh; }
 .stock-header { padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
 .stock-header .nm { font-size: 18px; font-weight: 700; }
 .stock-header .pr { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }

@@ -28,12 +28,11 @@ const candleSeries = chart.addCandlestickSeries({
 });
 const volumeSeries = chart.addHistogramSeries({
   priceFormat: { type: 'volume' },
-  priceScaleId: '', // 오버레이 스케일
+  priceScaleId: '',
 });
-// v4에서는 scaleMargins를 priceScale에 적용해야 거래량이 하단에만 그려진다
 volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
 
-let lastCandle = null; // 실시간으로 갱신할 마지막 봉
+let lastCandle = null;
 
 function resize() {
   chart.applyOptions({ width: chartEl.clientWidth, height: chartEl.clientHeight });
@@ -60,7 +59,6 @@ async function loadChart(period) {
   resize();
 }
 
-// 기간 탭
 document.querySelectorAll('.period-tabs button').forEach((btn) => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.period-tabs button').forEach((b) => b.classList.remove('active'));
@@ -68,40 +66,6 @@ document.querySelectorAll('.period-tabs button').forEach((btn) => {
     loadChart(btn.dataset.p);
   });
 });
-
-// ---------------- 호가창 ----------------
-const asksEl = $('#asks');
-const bidsEl = $('#bids');
-
-function renderOrderbook(ob) {
-  const maxQty = Math.max(
-    1,
-    ...ob.asks.map((a) => a.qty),
-    ...ob.bids.map((b) => b.qty)
-  );
-  // 매도: 높은가가 위로 오도록 역순
-  asksEl.innerHTML = ob.asks
-    .slice()
-    .reverse()
-    .map((a) => obRow('ask', a, maxQty))
-    .join('');
-  // 매수: 높은가가 위
-  bidsEl.innerHTML = ob.bids.map((b) => obRow('bid', b, maxQty)).join('');
-}
-
-function obRow(side, lvl, maxQty) {
-  const w = lvl.qty > 0 ? (lvl.qty / maxQty) * 100 : 0;
-  if (side === 'ask') {
-    return `<div class="ob-row ask">
-      <div class="qty"><span class="ob-bar" style="width:${w}%"></span>${lvl.qty ? fmt(lvl.qty) : ''}</div>
-      <div class="px down">${lvl.price ? fmt(lvl.price) : ''}</div>
-    </div>`;
-  }
-  return `<div class="ob-row bid">
-    <div class="qty"><span class="ob-bar" style="width:${w}%"></span>${lvl.qty ? fmt(lvl.qty) : ''}</div>
-    <div class="px up">${lvl.price ? fmt(lvl.price) : ''}</div>
-  </div>`;
-}
 
 // ---------------- 현재가 헤더 ----------------
 function setPrice(price, change, rate) {
@@ -111,27 +75,22 @@ function setPrice(price, change, rate) {
   $('#pr').textContent = fmt(price);
   $('#rt').className = `rate ${cls}`;
   $('#rt').textContent = `${sign} ${fmt(Math.abs(change))} (${rate}%)`;
-  $('#spread').textContent = `체결가 ${fmt(price)}`;
 }
 
-// ---------------- 실시간 수신 ----------------
+// ---------------- 실시간(폴링) 수신 ----------------
 window.api.onRealtime(({ symbol, type, payload }) => {
-  if (symbol !== SYMBOL) return;
-  if (type === 'orderbook') {
-    renderOrderbook(payload);
-  } else if (type === 'trade') {
-    setPrice(payload.price, payload.change, payload.changeRate);
-    // 마지막 봉을 실시간 체결가로 갱신
-    if (lastCandle) {
-      lastCandle = {
-        time: lastCandle.time,
-        open: lastCandle.open,
-        high: Math.max(lastCandle.high, payload.price),
-        low: Math.min(lastCandle.low, payload.price),
-        close: payload.price,
-      };
-      candleSeries.update(lastCandle);
-    }
+  if (symbol !== SYMBOL || type !== 'trade') return;
+  setPrice(payload.price, payload.change, payload.changeRate);
+  // 마지막 봉을 현재가로 갱신
+  if (lastCandle) {
+    lastCandle = {
+      time: lastCandle.time,
+      open: lastCandle.open,
+      high: Math.max(lastCandle.high, payload.price),
+      low: Math.min(lastCandle.low, payload.price),
+      close: payload.price,
+    };
+    candleSeries.update(lastCandle);
   }
 });
 
