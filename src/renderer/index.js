@@ -371,6 +371,7 @@ function sessionHtml(tz, s) {
   const openM = parseHM(s.open);
   const closeM = parseHM(s.close);
   const beforeOpen = nowM < openM;
+  const isOpen = nowM >= openM && nowM < closeM; // 현재 거래 중 여부
   const lbl = s.label ? `<b>${s.label}</b> ` : '';
   // 시작 전=빨강(up), 시작 후=파랑(down)
   const openCls = beforeOpen ? 'up' : 'down';
@@ -388,7 +389,8 @@ function sessionHtml(tz, s) {
     const closingSoon = minsToClose > 0 && minsToClose <= 30;
     html += `<span class="im-line${closingSoon ? ' mkt-closing' : ''}">${lbl}<span class="im-t">마감 ${s.close}</span> <span class="im-close">${closeTxt}</span></span>`;
   }
-  return html;
+  // 장 마감(미운영) 상태면 그레이 음영
+  return `<span class="mkt-session${isOpen ? '' : ' mkt-closed'}">${html}</span>`;
 }
 
 // 지수 셀 아래에 들어갈 장 운영시간 HTML
@@ -486,6 +488,6 @@ setInterval(loadIndices, 20000);
 setInterval(renderIndexBar, 30000); // 경과 시간 갱신
 window.api.getTheme().then(applyTheme);
 window.api.getVersion().then(
-  (v) => ($('#appVersion').textContent = `제작 Claudio Lim · v${v}`)
+  (v) => ($('#appVersion').textContent = `by Claudio Lim · v${v}`)
 );
 loadWatchlist();
