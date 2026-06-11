@@ -43,5 +43,17 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeListener('update', handler);
   },
 
+  // 외부 링크 (Chrome으로 열기)
+  openExternal: (url) => ipcRenderer.invoke('link:open', url),
+
+  // 테마 (light/dark)
+  getTheme: () => ipcRenderer.invoke('theme:get'),
+  setTheme: (theme) => ipcRenderer.invoke('theme:set', theme),
+  onThemeChange: (cb) => {
+    const handler = (_e, theme) => cb(theme);
+    ipcRenderer.on('theme', handler);
+    return () => ipcRenderer.removeListener('theme', handler);
+  },
+
   getVersion: () => ipcRenderer.invoke('app:version'),
 });

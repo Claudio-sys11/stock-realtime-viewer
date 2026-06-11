@@ -6,18 +6,21 @@ const NAME = params.get('name') || SYMBOL;
 
 const $ = (s) => document.querySelector(s);
 const fmt = (n) => Number(n).toLocaleString('ko-KR');
+const cssVar = (name) =>
+  getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 $('#nm').textContent = NAME;
 $('#cd').textContent = ` ${SYMBOL}`;
 document.title = `${NAME} (${SYMBOL})`;
 
+// 네이버 금융 페이지를 Chrome으로 열기
+$('#naverLink').addEventListener('click', () => {
+  window.api.openExternal(`https://finance.naver.com/item/main.naver?code=${SYMBOL}`);
+});
+
 // ---------------- 차트 ----------------
 const chartEl = $('#chart');
 const chart = LightweightCharts.createChart(chartEl, {
-  layout: { background: { color: '#0e1116' }, textColor: '#8b949e' },
-  grid: { vertLines: { color: '#1c232c' }, horzLines: { color: '#1c232c' } },
-  rightPriceScale: { borderColor: '#2a323d' },
-  timeScale: { borderColor: '#2a323d' },
   crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
 });
 
@@ -33,6 +36,23 @@ const volumeSeries = chart.addHistogramSeries({
 volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
 
 let lastCandle = null;
+
+function applyChartTheme() {
+  chart.applyOptions({
+    layout: { background: { color: cssVar('--chart-bg') }, textColor: cssVar('--muted') },
+    grid: {
+      vertLines: { color: cssVar('--chart-grid') },
+      horzLines: { color: cssVar('--chart-grid') },
+    },
+    rightPriceScale: { borderColor: cssVar('--border') },
+    timeScale: { borderColor: cssVar('--border') },
+  });
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
+  applyChartTheme();
+}
 
 function resize() {
   chart.applyOptions({ width: chartEl.clientWidth, height: chartEl.clientHeight });
@@ -67,21 +87,29 @@ document.querySelectorAll('.period-tabs button').forEach((btn) => {
   });
 });
 
-// ---------------- 현재가 헤더 ----------------
+// ---------------- 현재가 헤더 (시세 강조) ----------------
+let lastPrice = null;
 function setPrice(price, change, rate) {
   const cls = change > 0 ? 'up' : change < 0 ? 'down' : 'flat';
   const sign = change > 0 ? '▲' : change < 0 ? '▼' : '-';
-  $('#pr').className = `pr ${cls}`;
-  $('#pr').textContent = fmt(price);
+  const prEl = $('#pr');
+  prEl.className = `pr ${cls}`;
+  prEl.textContent = fmt(price);
   $('#rt').className = `rate ${cls}`;
   $('#rt').textContent = `${sign} ${fmt(Math.abs(change))} (${rate}%)`;
+
+  if (lastPrice != null && price !== lastPrice) {
+    prEl.classList.remove('flash-up', 'flash-down');
+    void prEl.offsetWidth;
+    prEl.classList.add(price > lastPrice ? 'flash-up' : 'flash-down');
+  }
+  lastPrice = price;
 }
 
 // ---------------- 실시간(폴링) 수신 ----------------
 window.api.onRealtime(({ symbol, type, payload }) => {
   if (symbol !== SYMBOL || type !== 'trade') return;
   setPrice(payload.price, payload.change, payload.changeRate);
-  // 마지막 봉을 현재가로 갱신
   if (lastCandle) {
     lastCandle = {
       time: lastCandle.time,
@@ -94,8 +122,13 @@ window.api.onRealtime(({ symbol, type, payload }) => {
   }
 });
 
+// 테마 변경 반영
+window.api.onThemeChange((t) => applyTheme(t));
+
 // ---------------- 초기화 ----------------
 (async function init() {
+  const theme = await window.api.getTheme();
+  applyTheme(theme);
   await loadChart('D');
   const q = await window.api.getQuote(SYMBOL);
   if (q.ok) setPrice(q.quote.price, q.quote.change, q.quote.changeRate);

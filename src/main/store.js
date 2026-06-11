@@ -16,10 +16,19 @@ class Store {
   _load() {
     try {
       const d = JSON.parse(fs.readFileSync(this.file, 'utf-8'));
-      return { watchlist: d.watchlist || [] };
+      return { watchlist: d.watchlist || [], theme: d.theme === 'dark' ? 'dark' : 'light' };
     } catch (_) {
-      return { watchlist: [] };
+      return { watchlist: [], theme: 'light' }; // 화이트 기본
     }
+  }
+
+  getTheme() {
+    return this.data.theme || 'light';
+  }
+
+  setTheme(theme) {
+    this.data.theme = theme === 'dark' ? 'dark' : 'light';
+    this._save();
   }
 
   _save() {

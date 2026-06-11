@@ -3,7 +3,7 @@
 const $ = (sel) => document.querySelector(sel);
 
 const watchEl = $('#watchlist');
-const items = new Map(); // symbol → {el, name}
+const items = new Map(); // symbol → {el, spark, closes, lastPrice}
 
 function fmt(n) {
   return Number(n).toLocaleString('ko-KR');
@@ -14,16 +14,67 @@ function colorClass(change) {
   return 'flat';
 }
 
+// ---- 테마 ----
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
+  const btn = $('#themeToggle');
+  if (btn) btn.textContent = theme === 'dark' ? '☀️ 화이트' : '🌙 블랙';
+  // 미니차트 색은 CSS 변수라 자동 반영되지만, 안전하게 다시 그림
+  for (const it of items.values()) drawSparkline(it);
+}
+$('#themeToggle').addEventListener('click', async () => {
+  const cur = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+  const next = cur === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  await window.api.setTheme(next);
+});
+window.api.onThemeChange((t) => applyTheme(t));
+
+// ---- 미니차트 (스파크라인) ----
+function drawSparkline(it) {
+  const closes = it.closes;
+  const svg = it.spark;
+  if (!svg || !closes || closes.length < 2) return;
+  const w = 72, h = 30, pad = 3;
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  const range = max - min || 1;
+  const pts = closes
+    .map((c, i) => {
+      const x = pad + (i / (closes.length - 1)) * (w - pad * 2);
+      const y = pad + (1 - (c - min) / range) * (h - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
+  const up = closes[closes.length - 1] >= closes[0];
+  const stroke = up ? 'var(--up)' : 'var(--down)';
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.innerHTML =
+    `<polyline points="${pts}" fill="none" stroke="${stroke}" ` +
+    `stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+}
+
+async function loadSparkline(symbol) {
+  const it = items.get(symbol);
+  if (!it) return;
+  const res = await window.api.getDailyChart(symbol, 'D');
+  if (!res.ok || !res.candles.length) return;
+  it.closes = res.candles.slice(-30).map((c) => c.close);
+  drawSparkline(it);
+}
+
+// ---- 관심종목 ----
 function renderItem(item) {
   const li = document.createElement('li');
   li.className = 'watch-item';
   li.dataset.symbol = item.symbol;
   li.innerHTML = `
-    <div>
+    <div class="wi-info">
       <div class="name">${item.name}</div>
       <div class="code">${item.symbol}</div>
     </div>
-    <div class="row">
+    <svg class="spark" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="wi-right">
       <div class="price">
         <div class="px">-</div>
         <div class="rate flat">-</div>
@@ -44,7 +95,19 @@ function renderItem(item) {
   });
 
   watchEl.appendChild(li);
-  items.set(item.symbol, { el: li, name: item.name });
+  items.set(item.symbol, {
+    el: li,
+    spark: li.querySelector('.spark'),
+    closes: null,
+    lastPrice: null,
+  });
+}
+
+function flash(el, dir) {
+  el.classList.remove('flash-up', 'flash-down');
+  // 리플로우로 애니메이션 재시작 보장
+  void el.offsetWidth;
+  el.classList.add(dir > 0 ? 'flash-up' : 'flash-down');
 }
 
 function updatePrice(symbol, price, change, rate) {
@@ -58,6 +121,17 @@ function updatePrice(symbol, price, change, rate) {
   rateEl.className = `rate ${cls}`;
   const sign = change > 0 ? '▲' : change < 0 ? '▼' : '-';
   rateEl.textContent = `${sign} ${fmt(Math.abs(change))} (${rate}%)`;
+
+  // 시세 변경 시 금액 강조 (직전 대비 방향으로 깜빡임)
+  if (it.lastPrice != null && price !== it.lastPrice) {
+    flash(pxEl, price > it.lastPrice ? 1 : -1);
+    // 미니차트 마지막 점을 실시간 가격으로 갱신
+    if (it.closes && it.closes.length) {
+      it.closes[it.closes.length - 1] = price;
+      drawSparkline(it);
+    }
+  }
+  it.lastPrice = price;
 }
 
 async function addSymbol(symbol) {
@@ -70,6 +144,7 @@ async function addSymbol(symbol) {
   if (res.quote) {
     updatePrice(res.item.symbol, res.quote.price, res.quote.change, res.quote.changeRate);
   }
+  loadSparkline(res.item.symbol);
   await window.api.subscribe(res.item.symbol);
   clearSearch();
 }
@@ -78,6 +153,7 @@ async function loadWatchlist() {
   const list = await window.api.getWatchlist();
   for (const item of list) {
     renderItem(item);
+    loadSparkline(item.symbol);
     window.api.subscribe(item.symbol);
     window.api.getQuote(item.symbol).then((r) => {
       if (r.ok) updatePrice(item.symbol, r.quote.price, r.quote.change, r.quote.changeRate);
@@ -187,6 +263,7 @@ searchInput.addEventListener('keydown', (e) => {
 searchInput.addEventListener('blur', () => setTimeout(() => (resultsEl.innerHTML = ''), 150));
 
 // ---- 초기화 ----
+window.api.getTheme().then(applyTheme);
 window.api.getVersion().then(
   (v) => ($('#appVersion').textContent = `제작 Claudio Lim · v${v}`)
 );

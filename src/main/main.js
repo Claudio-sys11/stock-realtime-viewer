@@ -1,7 +1,9 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const cp = require('child_process');
 const { autoUpdater } = require('electron-updater');
 
 const { NaverClient } = require('./naver');
@@ -203,7 +205,49 @@ function registerIpc() {
     return { ok: true };
   });
 
+  ipcMain.handle('link:open', (_e, url) => {
+    openInChrome(url);
+    return { ok: true };
+  });
+
+  ipcMain.handle('theme:get', () => store.getTheme());
+  ipcMain.handle('theme:set', (_e, theme) => {
+    const t = theme === 'dark' ? 'dark' : 'light';
+    store.setTheme(t);
+    // 모든 창에 테마 변경 알림
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) w.webContents.send('theme', t);
+    }
+    return { ok: true };
+  });
+
   ipcMain.handle('app:version', () => app.getVersion());
+}
+
+/** 외부 링크를 Chrome으로 연다 (없으면 기본 브라우저). */
+function openInChrome(url) {
+  if (!/^https?:\/\//i.test(url)) return;
+  const candidates = [
+    `${process.env.PROGRAMFILES || ''}\\Google\\Chrome\\Application\\chrome.exe`,
+    `${process.env['PROGRAMFILES(X86)'] || ''}\\Google\\Chrome\\Application\\chrome.exe`,
+    `${process.env.LOCALAPPDATA || ''}\\Google\\Chrome\\Application\\chrome.exe`,
+  ];
+  const chrome = candidates.find((p) => {
+    try {
+      return p && fs.existsSync(p);
+    } catch (_) {
+      return false;
+    }
+  });
+  try {
+    if (chrome) {
+      cp.spawn(chrome, [url], { detached: true, stdio: 'ignore' }).unref();
+    } else {
+      shell.openExternal(url); // Chrome 미설치 시 기본 브라우저
+    }
+  } catch (_) {
+    shell.openExternal(url);
+  }
 }
 
 // ---------------- 자동 업데이트 ----------------
