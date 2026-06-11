@@ -82,8 +82,11 @@ input {
 .idx:hover { background: var(--panel2); }
 .idx:last-child { border-right: none; }
 .idx-name { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.idx-main { display: flex; align-items: center; gap: 6px; }
+.idx-pr { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .idx-val { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .idx-rate { font-size: 10px; font-variant-numeric: tabular-nums; }
+.idx-spark { width: 56px; height: 23px; flex: none; margin-left: auto; }
 
 /* ---- 메인 창 (관심종목) ---- */
 .topbar {

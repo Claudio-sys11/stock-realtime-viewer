@@ -32,11 +32,13 @@ window.api.onThemeChange((t) => applyTheme(t));
 
 // ---- 미니차트 (스파크라인, 시작가 기준 위=빨강/아래=파랑) ----
 function drawSparkline(it) {
-  const closes = it.closes;
-  const svg = it.spark;
+  renderSparkline(it.spark, it.closes, it.startPrice);
+}
+
+function renderSparkline(svg, closes, startPrice) {
   if (!svg || !closes || closes.length < 2) return;
   const w = 72, h = 30, pad = 3;
-  const base = it.startPrice != null ? it.startPrice : closes[0]; // 시작가 기준선
+  const base = startPrice != null ? startPrice : closes[0]; // 시작가 기준선
   const min = Math.min(base, ...closes);
   const max = Math.max(base, ...closes);
   const range = max - min || 1;
@@ -292,6 +294,7 @@ const MARKET_HOURS = {
   SPX: { tz: 'America/New_York', sessions: [{ open: '09:30', close: '16:00' }] },
 };
 let indicesData = [];
+const indexCharts = {}; // key → { closes:[], startPrice }
 
 function fmt2(n) {
   return Number(n).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -361,17 +364,53 @@ function renderIndexBar() {
       const rate = ix.error ? '' : `${sign} ${Math.abs(ix.changeRate).toFixed(2)}%`;
       return `<div class="idx" data-key="${ix.key}" data-name="${ix.name}" title="${ix.name} 차트 보기">
         <span class="idx-name">${ix.name}</span>
-        <span class="idx-val">${val}</span>
-        <span class="idx-rate ${cls}">${rate}</span>
+        <div class="idx-main">
+          <div class="idx-pr">
+            <span class="idx-val">${val}</span>
+            <span class="idx-rate ${cls}">${rate}</span>
+          </div>
+          <svg class="idx-spark" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
         ${marketHoursHtml(ix.key)}
       </div>`;
     })
     .join('');
+  // 지수 숫자 오른쪽 미니차트 그리기 (캐시된 차트 + 라이브 마지막점)
+  indexBar.querySelectorAll('.idx').forEach((cell) => {
+    const ch = indexCharts[cell.dataset.key];
+    const svg = cell.querySelector('.idx-spark');
+    if (ch && svg) renderSparkline(svg, ch.closes, ch.startPrice);
+  });
 }
 
 async function loadIndices() {
   const res = await window.api.getIndices();
-  if (res.ok) indicesData = res.indices;
+  if (res.ok) {
+    indicesData = res.indices;
+    // 미니차트 마지막 점을 실시간 지수값으로 갱신
+    for (const ix of indicesData) {
+      const ch = indexCharts[ix.key];
+      if (ch && ch.closes.length && !ix.error) ch.closes[ch.closes.length - 1] = ix.price;
+    }
+  }
+  renderIndexBar();
+}
+
+async function loadIndexCharts() {
+  for (const key of Object.keys(MARKET_HOURS)) {
+    try {
+      const r = await window.api.getIndexChart(key, 'D');
+      if (r.ok && r.candles.length) {
+        const recent = r.candles.slice(-30);
+        indexCharts[key] = {
+          closes: recent.map((c) => c.close),
+          startPrice: recent[recent.length - 1].open,
+        };
+      }
+    } catch (_) {
+      /* 무시 */
+    }
+  }
   renderIndexBar();
 }
 
@@ -393,6 +432,8 @@ function updateClock() {
 // ---- 초기화 ----
 updateClock();
 setInterval(updateClock, 1000);
+loadIndexCharts();
+setInterval(loadIndexCharts, 300000); // 5분마다 지수 차트 갱신
 loadIndices();
 setInterval(loadIndices, 20000);
 setInterval(renderIndexBar, 30000); // 경과 시간 갱신
