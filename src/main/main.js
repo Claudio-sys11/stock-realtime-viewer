@@ -4,14 +4,13 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
-const { KisClient } = require('./kis');
-const { RealtimeManager } = require('./ws');
+const { Provider, BROKERS } = require('./provider');
 const { Store } = require('./store');
 
 const isDev = process.argv.includes('--dev');
 
 let store;
-let kis;
+let provider;
 let realtime;
 let mainWindow = null;
 
@@ -84,16 +83,8 @@ function routeRealtime(symbol, type, payload) {
   }
 }
 
-function initServices() {
-  store = new Store(app.getPath('userData'));
-  kis = new KisClient({
-    appKey: store.get('appKey'),
-    appSecret: store.get('appSecret'),
-    mock: store.get('mock'),
-  });
-  realtime = new RealtimeManager({
-    getApprovalKey: () => kis.getApprovalKey(),
-    getWsHost: () => kis.wsHost,
+function buildRealtime() {
+  return provider.createRealtime({
     onData: routeRealtime,
     onStatus: (status, detail) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -103,30 +94,62 @@ function initServices() {
   });
 }
 
+function initServices() {
+  store = new Store(app.getPath('userData'));
+  const broker = store.getBroker();
+  provider = new Provider(broker, store.getCreds(broker));
+  realtime = buildRealtime();
+}
+
+/** 증권사/자격증명 변경 후 provider·실시간 재구성 + 기존 구독 복구 */
+async function rebuildProvider() {
+  if (realtime) realtime.close();
+  const broker = store.getBroker();
+  provider = new Provider(broker, store.getCreds(broker));
+  realtime = buildRealtime();
+  // 관심종목 + 열린 차트창의 합집합을 새 증권사로 재구독
+  const symbols = new Set([
+    ...store.getWatchlist().map((x) => x.symbol),
+    ...stockWindows.keys(),
+  ]);
+  for (const symbol of symbols) {
+    try {
+      await realtime.subscribe(symbol);
+    } catch (_) {
+      /* 자격증명 미입력 등은 조용히 무시 */
+    }
+  }
+}
+
 // ---------------- IPC 핸들러 ----------------
 
 function registerIpc() {
   ipcMain.handle('config:get', () => {
-    const all = store.getAll();
-    // 시크릿은 보유 여부만 노출
+    // 증권사별 자격증명(시크릿은 보유 여부만 노출)
+    const brokers = {};
+    for (const b of BROKERS) {
+      const c = store.getCreds(b.id);
+      brokers[b.id] = { appKey: c.appKey, hasSecret: !!c.appSecret, mock: c.mock };
+    }
     return {
-      appKey: all.appKey,
-      hasSecret: !!all.appSecret,
-      mock: all.mock,
-      watchlist: all.watchlist || [],
+      broker: store.getBroker(),
+      brokerList: BROKERS,
+      brokers,
+      watchlist: store.getWatchlist(),
     };
   });
 
-  ipcMain.handle('config:setCredentials', (_e, creds) => {
+  ipcMain.handle('config:setCredentials', async (_e, creds) => {
+    const broker = BROKERS.some((b) => b.id === creds.broker) ? creds.broker : 'kis';
     // appSecret이 null/undefined면 기존 시크릿 유지
-    const appSecret =
-      creds.appSecret == null ? store.get('appSecret') : creds.appSecret;
-    store.setCredentials({ appKey: creds.appKey, appSecret, mock: creds.mock });
-    kis.setConfig({
-      appKey: store.get('appKey'),
-      appSecret: store.get('appSecret'),
-      mock: store.get('mock'),
+    const prev = store.getCreds(broker);
+    const appSecret = creds.appSecret == null ? prev.appSecret : creds.appSecret;
+    store.setCredentials(broker, {
+      appKey: creds.appKey,
+      appSecret,
+      mock: creds.mock,
     });
+    await rebuildProvider();
     return { ok: true };
   });
 
@@ -136,7 +159,7 @@ function registerIpc() {
       return { ok: false, error: '종목코드는 6자리 숫자입니다.' };
     }
     try {
-      const quote = await kis.getQuote(symbol);
+      const quote = await provider.getQuote(symbol);
       store.addToWatchlist({ symbol, name: quote.name });
       return { ok: true, item: { symbol, name: quote.name }, quote };
     } catch (e) {
@@ -156,7 +179,7 @@ function registerIpc() {
 
   ipcMain.handle('chart:daily', async (_e, { symbol, period }) => {
     try {
-      const candles = await kis.getDailyChart(symbol, period || 'D');
+      const candles = await provider.getDailyChart(symbol, period || 'D');
       return { ok: true, candles };
     } catch (e) {
       return { ok: false, error: e.message };
@@ -165,7 +188,7 @@ function registerIpc() {
 
   ipcMain.handle('quote:get', async (_e, symbol) => {
     try {
-      return { ok: true, quote: await kis.getQuote(symbol) };
+      return { ok: true, quote: await provider.getQuote(symbol) };
     } catch (e) {
       return { ok: false, error: e.message };
     }

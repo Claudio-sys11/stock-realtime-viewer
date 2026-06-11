@@ -25,13 +25,16 @@
   <div class="status">
     <span id="wsDot" class="dot"></span>
     <span id="wsText">대기 중</span>
+    <span id="brokerName" class="muted" style="margin-left:8px"></span>
     <span style="float:right" id="appVersion"></span>
   </div>
 
   <!-- 설정 모달 -->
   <div class="modal-backdrop" id="settingsModal">
     <div class="modal">
-      <h3>한국투자증권 API 설정</h3>
+      <h3>증권사 API 설정</h3>
+      <label>증권사</label>
+      <select id="cfgBroker"></select>
       <label>App Key</label>
       <input id="cfgAppKey" placeholder="앱키" />
       <label>App Secret</label>

@@ -1,23 +1,33 @@
 # StockViewer — 실시간 주식 차트/호가 뷰어
 
-한국투자증권(KIS) Open API로 국내 주식의 **실시간 차트·호가·체결**을 보여주는 Windows 데스크톱 앱입니다.
-관심종목을 더블클릭하면 **새 창**으로 차트+호가가 열리고, **GitHub Releases로 자동 업데이트**됩니다.
+국내 주식의 **실시간 차트·호가·체결**을 보여주는 Windows 데스크톱 앱입니다.
+**한국투자증권(KIS)** 과 **키움증권(REST API)** 중 골라서 쓸 수 있고,
+관심종목을 클릭하면 **새 창**으로 차트+호가가 열리며, **GitHub Releases로 자동 업데이트**됩니다.
 
 ## 주요 기능
+- **증권사 선택**: 한국투자증권(KIS) / 키움증권(REST) — 설정에서 전환, 자격증명은 증권사별로 따로 저장
 - 관심종목 리스트 (종목코드 추가/삭제, 실시간 현재가)
 - 종목별 **독립 창**: 캔들 차트(일/주/월) + 10단계 실시간 호가창
-- KIS **WebSocket** 실시간 체결/호가 구독
+- **WebSocket** 실시간 체결/호가 구독
 - `electron-updater` 기반 자동 업데이트
 - API 키는 로컬 `userData/config.json`에만 저장 (레포에 올라가지 않음)
 
 ---
 
-## 1. 사전 준비: KIS API 키 발급
-1. [한국투자증권 KIS Developers](https://apiportal.koreainvestment.com/) 가입
-2. 계좌 연결 후 **앱 등록** → `App Key` / `App Secret` 발급
-3. (선택) 모의투자 신청 시 모의 도메인 사용 가능
+## 1. 사전 준비: 증권사 API 키 발급
 
-> ⚠️ 실시간 시세 WebSocket은 계좌/약관 동의가 필요합니다. 발급한 키가 실시간 시세 권한을 포함하는지 확인하세요.
+원하는 증권사 한 곳(또는 둘 다)에서 키를 발급받으세요.
+
+**한국투자증권 (KIS)**
+1. [KIS Developers](https://apiportal.koreainvestment.com/) 가입 → 계좌 연결 후 **앱 등록**
+2. `App Key` / `App Secret` 발급 (모의투자 신청 시 모의 도메인 사용 가능)
+
+**키움증권 (REST API)**
+1. [키움 OpenAPI(REST)](https://openapi.kiwoom.com/) 가입 → **앱 등록**
+2. `App Key` / `Secret Key` 발급
+3. ⚠️ 옛 OpenAPI+(32bit OCX)가 **아니라** 신규 **REST API** 서비스 신청이 필요합니다.
+
+> ⚠️ 두 증권사 모두 실시간 시세 WebSocket은 계좌/약관 동의가 필요합니다. 발급한 키가 실시간 시세 권한을 포함하는지 확인하세요.
 
 ## 2. 개발 모드 실행
 ```powershell
@@ -25,7 +35,8 @@ cd stock-viewer
 npm install
 npm run dev
 ```
-앱 실행 후 우측 상단 **⚙ 설정**에서 App Key / App Secret 입력 → 저장.
+앱 실행 후 우측 상단 **⚙ 설정** → **증권사 선택** → App Key / Secret 입력 → 저장.
+(증권사를 바꾸면 해당 증권사의 저장된 키가 표시되고, 저장 시 그 증권사로 전환됩니다.)
 종목코드 6자리(예: `005930` 삼성전자)를 입력해 추가하고, 항목을 클릭하면 차트 창이 열립니다.
 
 ## 3. .exe 빌드

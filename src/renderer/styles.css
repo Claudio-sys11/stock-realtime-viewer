@@ -90,7 +90,15 @@ input {
 }
 .modal h3 { margin: 0 0 12px; }
 .modal label { display:block; font-size:12px; color:var(--muted); margin: 10px 0 4px; }
-.modal input { width: 100%; }
+.modal input, .modal select { width: 100%; }
+.modal select {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
 .modal .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
 
 /* ---- 종목 창 (차트+호가) ---- */

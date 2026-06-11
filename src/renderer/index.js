@@ -79,8 +79,14 @@ async function addSymbol(symbol) {
   $('#symbolInput').value = '';
 }
 
+function setBrokerBadge(cfg) {
+  const b = cfg.brokerList.find((x) => x.id === cfg.broker);
+  $('#brokerName').textContent = b ? `· ${b.label}` : '';
+}
+
 async function loadWatchlist() {
   const cfg = await window.api.getConfig();
+  setBrokerBadge(cfg);
   for (const item of cfg.watchlist) {
     renderItem(item);
     window.api.subscribe(item.symbol);
@@ -119,26 +125,52 @@ window.api.onUpdate((u) => {
 
 // ---- 설정 모달 ----
 const modal = $('#settingsModal');
+const brokerSel = $('#cfgBroker');
+let cfgCache = null;
+
+function fillBrokerFields(broker) {
+  const b = (cfgCache && cfgCache.brokers[broker]) || {
+    appKey: '',
+    hasSecret: false,
+    mock: false,
+  };
+  $('#cfgAppKey').value = b.appKey || '';
+  $('#cfgAppSecret').value = b.hasSecret ? '********' : '';
+  $('#cfgMock').checked = !!b.mock;
+}
+
 $('#btnSettings').addEventListener('click', async () => {
-  const cfg = await window.api.getConfig();
-  $('#cfgAppKey').value = cfg.appKey || '';
-  $('#cfgAppSecret').value = cfg.hasSecret ? '********' : '';
-  $('#cfgMock').checked = !!cfg.mock;
+  cfgCache = await window.api.getConfig();
+  // 증권사 목록 채우기
+  brokerSel.innerHTML = cfgCache.brokerList
+    .map((b) => `<option value="${b.id}">${b.label}</option>`)
+    .join('');
+  brokerSel.value = cfgCache.broker;
+  fillBrokerFields(cfgCache.broker);
   modal.classList.add('show');
 });
+
+// 증권사 바꾸면 해당 증권사의 저장된 키를 표시
+brokerSel.addEventListener('change', () => fillBrokerFields(brokerSel.value));
+
 $('#cfgCancel').addEventListener('click', () => modal.classList.remove('show'));
 $('#cfgSave').addEventListener('click', async () => {
+  const broker = brokerSel.value;
   const appKey = $('#cfgAppKey').value.trim();
   const raw = $('#cfgAppSecret').value;
   // 마스킹('********')을 그대로 두면 시크릿 변경 안 함(null=기존 유지)
   const appSecret = raw === '********' ? null : raw;
   await window.api.setCredentials({
+    broker,
     appKey,
     appSecret, // null이면 메인에서 기존 시크릿 유지
     mock: $('#cfgMock').checked,
   });
   modal.classList.remove('show');
-  alert('저장되었습니다. 종목을 추가해 보세요.');
+  // 배지 갱신
+  cfgCache = await window.api.getConfig();
+  setBrokerBadge(cfgCache);
+  alert(`저장되었습니다. (${brokerSel.options[brokerSel.selectedIndex].text})`);
 });
 
 // ---- 종목 추가 ----
