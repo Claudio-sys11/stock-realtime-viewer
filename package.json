@@ -41,7 +41,8 @@
       {
         "provider": "github",
         "owner": "Claudio-sys11",
-        "repo": "stock-realtime-viewer"
+        "repo": "stock-realtime-viewer",
+        "releaseType": "release"
       }
     ]
   },
