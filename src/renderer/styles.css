@@ -157,6 +157,23 @@ input {
 .im-t { color: var(--muted); }
 .im-close { color: var(--muted); }
 
+/* 장 마감 30분 전: 빨간 네온 깜빡임 */
+.mkt-closing, .mkt-closing .im-t, .mkt-closing .im-close, .mkt-closing b {
+  color: #ff2d2d !important;
+  font-weight: 700;
+}
+.mkt-closing { animation: neonBlink 1s ease-in-out infinite; }
+@keyframes neonBlink {
+  0%, 100% {
+    opacity: 1;
+    text-shadow: 0 0 3px #ff2d2d, 0 0 7px #ff2d2d, 0 0 12px rgba(255, 45, 45, .8);
+  }
+  50% {
+    opacity: 0.45;
+    text-shadow: 0 0 1px #ff2d2d;
+  }
+}
+
 .status { font-size: 11px; padding: 6px 12px; color: var(--muted); border-top: 1px solid var(--border); }
 .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#999; margin-right:6px; }
 .dot.connected { background:#2ea043; }

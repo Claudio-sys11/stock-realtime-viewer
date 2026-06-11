@@ -380,10 +380,13 @@ function sessionHtml(tz, s) {
   let html = `<span class="im-line">${lbl}<span class="im-t">장시작 ${s.open}</span> <span class="${openCls}">${openTxt}</span></span>`;
   // 시작 전이면 마감 정보 숨김
   if (!beforeOpen) {
-    const closeTxt = nowM < closeM
-      ? `마감 전 ${fmtDur(closeM - nowM)}`
-      : `마감 후 ${fmtDur(nowM - closeM)}`;
-    html += `<span class="im-line">${lbl}<span class="im-t">마감 ${s.close}</span> <span class="im-close">${closeTxt}</span></span>`;
+    const minsToClose = closeM - nowM;
+    const closeTxt = minsToClose > 0
+      ? `마감 전 ${fmtDur(minsToClose)}`
+      : `마감 후 ${fmtDur(-minsToClose)}`;
+    // 마감 30분 전부터 마감 직전까지 빨간 네온 깜빡임
+    const closingSoon = minsToClose > 0 && minsToClose <= 30;
+    html += `<span class="im-line${closingSoon ? ' mkt-closing' : ''}">${lbl}<span class="im-t">마감 ${s.close}</span> <span class="im-close">${closeTxt}</span></span>`;
   }
   return html;
 }
