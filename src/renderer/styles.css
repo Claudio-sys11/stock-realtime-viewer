@@ -1,0 +1,118 @@
+:root {
+  --bg: #0e1116;
+  --panel: #161b22;
+  --panel2: #1c232c;
+  --border: #2a323d;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --up: #f23645;     /* 상승=빨강 (한국식) */
+  --down: #2962ff;   /* 하락=파랑 */
+  --accent: #2f81f7;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+}
+
+button {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+button:hover { filter: brightness(1.1); }
+button.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+
+input {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.row { display: flex; gap: 8px; align-items: center; }
+.muted { color: var(--muted); }
+.up { color: var(--up); }
+.down { color: var(--down); }
+.flat { color: var(--muted); }
+
+/* ---- 메인 창 (관심종목) ---- */
+.topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.add-row { padding: 10px 12px; display: flex; gap: 8px; }
+.add-row input { flex: 1; }
+
+.watchlist { list-style: none; margin: 0; padding: 0; }
+.watch-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.watch-item:hover { background: var(--panel2); }
+.watch-item .name { font-weight: 600; }
+.watch-item .code { color: var(--muted); font-size: 11px; }
+.watch-item .price { text-align: right; font-variant-numeric: tabular-nums; }
+.watch-item .rate { font-size: 11px; }
+.watch-item .del {
+  background: transparent; border: none; color: var(--muted);
+  font-size: 16px; padding: 0 6px; cursor: pointer;
+}
+
+.status { font-size: 11px; padding: 6px 12px; color: var(--muted); border-top: 1px solid var(--border); }
+.dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#666; margin-right:6px; }
+.dot.connected { background:#3fb950; }
+.dot.connecting { background:#d29922; }
+.dot.error, .dot.disconnected { background:#f85149; }
+
+/* 설정 모달 */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6);
+  display: none; align-items: center; justify-content: center;
+}
+.modal-backdrop.show { display: flex; }
+.modal {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 10px; padding: 18px; width: 340px;
+}
+.modal h3 { margin: 0 0 12px; }
+.modal label { display:block; font-size:12px; color:var(--muted); margin: 10px 0 4px; }
+.modal input { width: 100%; }
+.modal .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+
+/* ---- 종목 창 (차트+호가) ---- */
+.stock-layout { display: grid; grid-template-columns: 1fr 260px; height: 100vh; }
+.chart-pane { display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+.stock-header { padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
+.stock-header .nm { font-size: 18px; font-weight: 700; }
+.stock-header .pr { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.period-tabs { display:flex; gap:6px; padding: 8px 16px; }
+.period-tabs button { background: var(--panel2); color: var(--muted); }
+.period-tabs button.active { background: var(--accent); color:#fff; }
+#chart { flex: 1; min-height: 0; }
+
+.orderbook { display:flex; flex-direction:column; background: var(--panel); }
+.ob-title { padding: 10px 12px; border-bottom:1px solid var(--border); color: var(--muted); font-size:12px; }
+.ob-rows { display:flex; flex-direction:column; flex:1; }
+.ob-row { display:grid; grid-template-columns: 1fr 90px; align-items:center; height: 26px; padding: 0 10px; font-variant-numeric: tabular-nums; }
+.ob-row .qty { text-align:left; color: var(--muted); position: relative; }
+.ob-row .px { text-align:right; font-weight:600; }
+.ob-row.ask { background: rgba(41,98,255,.06); }
+.ob-row.bid { background: rgba(242,54,69,.06); }
+.ob-bar { position:absolute; right:0; top:3px; bottom:3px; border-radius:3px; opacity:.35; }
+.ob-row.ask .ob-bar { background: var(--down); }
+.ob-row.bid .ob-bar { background: var(--up); }
+.ob-spread { text-align:center; padding:6px; color:var(--muted); border-block:1px solid var(--border); font-size:11px; }

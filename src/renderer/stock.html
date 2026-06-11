@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'" />
+  <title>종목</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="../../node_modules/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+  <div class="stock-layout">
+    <div class="chart-pane">
+      <div class="stock-header">
+        <div class="row" style="justify-content:space-between">
+          <div>
+            <span class="nm" id="nm">종목</span>
+            <span class="muted" id="cd"></span>
+          </div>
+          <div style="text-align:right">
+            <div class="pr" id="pr">-</div>
+            <div class="rate flat" id="rt">-</div>
+          </div>
+        </div>
+      </div>
+      <div class="period-tabs">
+        <button data-p="D" class="active">일</button>
+        <button data-p="W">주</button>
+        <button data-p="M">월</button>
+      </div>
+      <div id="chart"></div>
+    </div>
+
+    <div class="orderbook">
+      <div class="ob-title">실시간 호가</div>
+      <div class="ob-rows" id="asks"></div>
+      <div class="ob-spread" id="spread">체결가 -</div>
+      <div class="ob-rows" id="bids"></div>
+    </div>
+  </div>
+
+  <script src="stock.js"></script>
+</body>
+</html>
