@@ -108,6 +108,39 @@ class NaverClient {
     });
   }
 
+  /** 주요 지수 (코스피 / 나스닥 / S&P500) */
+  async getIndices() {
+    const defs = [
+      { key: 'KOSPI', name: '코스피', kind: 'domestic', code: 'KOSPI' },
+      { key: 'IXIC', name: '나스닥', kind: 'worldstock', code: '.IXIC' },
+      { key: 'SPX', name: 'S&P500', kind: 'worldstock', code: '.INX' },
+    ];
+    return Promise.all(
+      defs.map(async (d) => {
+        try {
+          const url =
+            `https://polling.finance.naver.com/api/realtime/${d.kind}/index/` +
+            encodeURIComponent(d.code);
+          const res = await fetch(url, { headers: HEADERS });
+          const data = await res.json();
+          const x = (data.datas || [])[0] || {};
+          const sig = x.compareToPreviousPrice && x.compareToPreviousPrice.code;
+          const dir = sig === '4' || sig === '5' ? -1 : 1;
+          const rate = num(x.fluctuationsRatio);
+          return {
+            key: d.key,
+            name: d.name,
+            price: num(x.closePrice),
+            change: num(x.compareToPreviousClosePrice),
+            changeRate: rate !== 0 ? dir * Math.abs(rate) : 0,
+          };
+        } catch (_) {
+          return { key: d.key, name: d.name, price: 0, change: 0, changeRate: 0, error: true };
+        }
+      })
+    );
+  }
+
   /** 종목명/코드 검색 */
   async search(query) {
     query = String(query || '').trim();

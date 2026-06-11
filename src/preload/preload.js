@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld('api', {
   // 종목 검색 (이름/코드)
   searchStocks: (query) => ipcRenderer.invoke('stocks:search', query),
 
+  // 주요 지수 (코스피/나스닥/S&P500)
+  getIndices: () => ipcRenderer.invoke('indices:get'),
+
   // 관심종목
   getWatchlist: () => ipcRenderer.invoke('watchlist:get'),
   addWatch: (symbol) => ipcRenderer.invoke('watchlist:add', symbol),

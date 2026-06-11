@@ -187,6 +187,14 @@ function registerIpc() {
     }
   });
 
+  ipcMain.handle('indices:get', async () => {
+    try {
+      return { ok: true, indices: await naver.getIndices() };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+
   ipcMain.handle('stocks:search', async (_e, query) => {
     try {
       return { ok: true, results: await naver.search(query) };

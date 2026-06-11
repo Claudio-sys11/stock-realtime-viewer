@@ -72,6 +72,18 @@ input {
 .down { color: var(--down); }
 .flat { color: var(--muted); }
 
+/* ---- 지수 바 (코스피/나스닥/S&P500) ---- */
+.index-bar { display: flex; background: var(--panel); border-bottom: 1px solid var(--border); }
+.idx {
+  flex: 1; padding: 6px 10px; min-width: 0;
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 1px;
+}
+.idx:last-child { border-right: none; }
+.idx-name { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.idx-val { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.idx-rate { font-size: 10px; font-variant-numeric: tabular-nums; }
+
 /* ---- 메인 창 (관심종목) ---- */
 .topbar {
   display: flex; justify-content: space-between; align-items: center;

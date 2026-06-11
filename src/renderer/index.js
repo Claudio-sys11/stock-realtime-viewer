@@ -262,7 +262,32 @@ searchInput.addEventListener('keydown', (e) => {
 
 searchInput.addEventListener('blur', () => setTimeout(() => (resultsEl.innerHTML = ''), 150));
 
+// ---- 주요 지수 (코스피/나스닥/S&P500) ----
+const indexBar = $('#indexBar');
+function fmt2(n) {
+  return Number(n).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+async function loadIndices() {
+  const res = await window.api.getIndices();
+  if (!res.ok) return;
+  indexBar.innerHTML = res.indices
+    .map((ix) => {
+      const cls = colorClass(ix.changeRate);
+      const sign = ix.changeRate > 0 ? '▲' : ix.changeRate < 0 ? '▼' : '-';
+      const val = ix.error ? '-' : fmt2(ix.price);
+      const rate = ix.error ? '' : `${sign} ${Math.abs(ix.changeRate).toFixed(2)}%`;
+      return `<div class="idx">
+        <span class="idx-name">${ix.name}</span>
+        <span class="idx-val">${val}</span>
+        <span class="idx-rate ${cls}">${rate}</span>
+      </div>`;
+    })
+    .join('');
+}
+
 // ---- 초기화 ----
+loadIndices();
+setInterval(loadIndices, 20000);
 window.api.getTheme().then(applyTheme);
 window.api.getVersion().then(
   (v) => ($('#appVersion').textContent = `제작 Claudio Lim · v${v}`)
