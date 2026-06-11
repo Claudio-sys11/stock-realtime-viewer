@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'" />
-  <title>StockViewer — 관심종목</title>
+  <title>주식 뷰어 — 관심종목</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -15,9 +15,9 @@
     </div>
   </div>
 
-  <div class="add-row">
-    <input id="symbolInput" placeholder="종목코드 6자리 (예: 005930)" maxlength="6" />
-    <button id="btnAdd">추가</button>
+  <div class="search-box">
+    <input id="symbolInput" placeholder="종목명 또는 코드 검색 (예: 삼성전자, 005930)" autocomplete="off" />
+    <ul id="searchResults" class="search-results"></ul>
   </div>
 
   <ul class="watchlist" id="watchlist"></ul>
@@ -35,10 +35,10 @@
       <h3>증권사 API 설정</h3>
       <label>증권사</label>
       <select id="cfgBroker"></select>
-      <label>App Key</label>
-      <input id="cfgAppKey" placeholder="앱키" />
-      <label>App Secret</label>
-      <input id="cfgAppSecret" type="password" placeholder="앱시크릿 (저장됨)" />
+      <label>앱 키 (App Key)</label>
+      <input id="cfgAppKey" placeholder="앱 키" />
+      <label>앱 시크릿 (App Secret)</label>
+      <input id="cfgAppSecret" type="password" placeholder="앱 시크릿 (저장됨)" />
       <label class="row" style="margin-top:12px; gap:6px;">
         <input type="checkbox" id="cfgMock" style="width:auto" /> 모의투자 계좌 사용
       </label>

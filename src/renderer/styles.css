@@ -56,6 +56,27 @@ input {
 .add-row { padding: 10px 12px; display: flex; gap: 8px; }
 .add-row input { flex: 1; }
 
+/* 종목 검색 */
+.search-box { position: relative; padding: 10px 12px; }
+.search-box input { width: 100%; }
+.search-results {
+  list-style: none; margin: 4px 0 0; padding: 0;
+  position: absolute; left: 12px; right: 12px; top: 44px; z-index: 20;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; max-height: 280px; overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+.search-results:empty { display: none; }
+.search-result {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 12px; cursor: pointer; border-bottom: 1px solid var(--border);
+}
+.search-result:last-child { border-bottom: none; }
+.search-result:hover, .search-result.active { background: var(--panel2); }
+.search-result .sr-name { font-weight: 600; }
+.search-result .sr-meta { color: var(--muted); font-size: 11px; }
+.search-result .sr-code { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
 .watchlist { list-style: none; margin: 0; padding: 0; }
 .watch-item {
   display: flex; justify-content: space-between; align-items: center;

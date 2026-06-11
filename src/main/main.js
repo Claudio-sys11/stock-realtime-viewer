@@ -23,7 +23,7 @@ function createMainWindow() {
     height: 640,
     minWidth: 360,
     minHeight: 480,
-    title: 'StockViewer — 관심종목',
+    title: '주식 뷰어 — 관심종목',
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       contextIsolation: true,
@@ -208,7 +208,34 @@ function registerIpc() {
     return { ok: true };
   });
 
+  ipcMain.handle('stocks:search', async (_e, query) => {
+    try {
+      return { ok: true, results: await searchStocks(query) };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+
   ipcMain.handle('app:version', () => app.getVersion());
+}
+
+/**
+ * 종목명/코드 검색 (네이버 종목 자동완성 사용 — 증권사 무관, 실시간 최신).
+ * @returns {Promise<Array<{code,name,market}>>}
+ */
+async function searchStocks(query) {
+  query = String(query || '').trim();
+  if (!query) return [];
+  const url = `https://ac.stock.naver.com/ac?q=${encodeURIComponent(query)}&target=stock&st=111`;
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://finance.naver.com/' },
+  });
+  if (!res.ok) throw new Error(`검색 실패 (${res.status})`);
+  const data = await res.json();
+  return (data.items || [])
+    .filter((it) => it.nationCode === 'KOR' && /^\d{6}$/.test(it.code))
+    .slice(0, 20)
+    .map((it) => ({ code: it.code, name: it.name, market: it.typeName || '' }));
 }
 
 // ---------------- 자동 업데이트 ----------------

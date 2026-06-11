@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('api', {
   getConfig: () => ipcRenderer.invoke('config:get'),
   setCredentials: (creds) => ipcRenderer.invoke('config:setCredentials', creds),
 
+  // 종목 검색 (이름/코드)
+  searchStocks: (query) => ipcRenderer.invoke('stocks:search', query),
+
   // 관심종목
   addWatch: (symbol) => ipcRenderer.invoke('watchlist:add', symbol),
   removeWatch: (symbol) => ipcRenderer.invoke('watchlist:remove', symbol),

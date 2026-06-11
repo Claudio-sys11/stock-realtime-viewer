@@ -76,7 +76,7 @@ async function addSymbol(symbol) {
     updatePrice(res.item.symbol, res.quote.price, res.quote.change, res.quote.changeRate);
   }
   await window.api.subscribe(res.item.symbol);
-  $('#symbolInput').value = '';
+  clearSearch();
 }
 
 function setBrokerBadge(cfg) {
@@ -173,12 +173,88 @@ $('#cfgSave').addEventListener('click', async () => {
   alert(`저장되었습니다. (${brokerSel.options[brokerSel.selectedIndex].text})`);
 });
 
-// ---- 종목 추가 ----
-$('#btnAdd').addEventListener('click', () => addSymbol($('#symbolInput').value));
-$('#symbolInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') addSymbol($('#symbolInput').value);
+// ---- 종목 검색 + 선택 ----
+const searchInput = $('#symbolInput');
+const resultsEl = $('#searchResults');
+let searchTimer = null;
+let currentResults = [];
+let activeIdx = -1;
+
+function clearSearch() {
+  searchInput.value = '';
+  resultsEl.innerHTML = '';
+  currentResults = [];
+  activeIdx = -1;
+}
+
+function renderResults(results) {
+  currentResults = results;
+  activeIdx = -1;
+  resultsEl.innerHTML = results
+    .map(
+      (r, i) => `
+    <li class="search-result" data-idx="${i}" data-code="${r.code}">
+      <span><span class="sr-name">${r.name}</span> <span class="sr-meta">${r.market}</span></span>
+      <span class="sr-code">${r.code}</span>
+    </li>`
+    )
+    .join('');
+  // mousedown으로 처리해 input blur보다 먼저 실행
+  resultsEl.querySelectorAll('.search-result').forEach((li) => {
+    li.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      addSymbol(li.dataset.code);
+    });
+  });
+}
+
+async function doSearch(q) {
+  q = q.trim();
+  if (!q) {
+    resultsEl.innerHTML = '';
+    currentResults = [];
+    return;
+  }
+  const res = await window.api.searchStocks(q);
+  if (res.ok) renderResults(res.results);
+}
+
+function moveActive(d) {
+  const lis = [...resultsEl.querySelectorAll('.search-result')];
+  if (!lis.length) return;
+  activeIdx = (activeIdx + d + lis.length) % lis.length;
+  lis.forEach((li, i) => li.classList.toggle('active', i === activeIdx));
+  lis[activeIdx].scrollIntoView({ block: 'nearest' });
+}
+
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  const q = searchInput.value;
+  searchTimer = setTimeout(() => doSearch(q), 200);
 });
 
+searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    moveActive(1);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    moveActive(-1);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (activeIdx >= 0 && currentResults[activeIdx]) addSymbol(currentResults[activeIdx].code);
+    else if (/^\d{6}$/.test(searchInput.value.trim())) addSymbol(searchInput.value.trim());
+    else if (currentResults[0]) addSymbol(currentResults[0].code);
+  } else if (e.key === 'Escape') {
+    resultsEl.innerHTML = '';
+  }
+});
+
+// 포커스 잃으면 결과 닫기 (클릭 처리 후)
+searchInput.addEventListener('blur', () => setTimeout(() => (resultsEl.innerHTML = ''), 150));
+
 // ---- 초기화 ----
-window.api.getVersion().then((v) => ($('#appVersion').textContent = `v${v}`));
+window.api.getVersion().then(
+  (v) => ($('#appVersion').textContent = `제작 Claudio Lim · v${v}`)
+);
 loadWatchlist();
