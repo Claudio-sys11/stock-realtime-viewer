@@ -262,44 +262,18 @@ searchInput.addEventListener('keydown', (e) => {
 
 searchInput.addEventListener('blur', () => setTimeout(() => (resultsEl.innerHTML = ''), 150));
 
-// ---- 주요 지수 (코스피/나스닥/S&P500) ----
+// ---- 주요 지수 + 장 운영시간 (상단) ----
 const indexBar = $('#indexBar');
+const MARKET_HOURS = {
+  KOSPI: { tz: 'Asia/Seoul', open: '09:00', close: '15:30' },
+  IXIC: { tz: 'America/New_York', open: '09:30', close: '16:00' },
+  SPX: { tz: 'America/New_York', open: '09:30', close: '16:00' },
+};
+let indicesData = [];
+
 function fmt2(n) {
   return Number(n).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-async function loadIndices() {
-  const res = await window.api.getIndices();
-  if (!res.ok) return;
-  indexBar.innerHTML = res.indices
-    .map((ix) => {
-      const cls = colorClass(ix.changeRate);
-      const sign = ix.changeRate > 0 ? '▲' : ix.changeRate < 0 ? '▼' : '-';
-      const val = ix.error ? '-' : fmt2(ix.price);
-      const rate = ix.error ? '' : `${sign} ${Math.abs(ix.changeRate).toFixed(2)}%`;
-      return `<div class="idx" data-key="${ix.key}" data-name="${ix.name}" title="${ix.name} 차트 보기">
-        <span class="idx-name">${ix.name}</span>
-        <span class="idx-val">${val}</span>
-        <span class="idx-rate ${cls}">${rate}</span>
-      </div>`;
-    })
-    .join('');
-}
-
-// 지수 클릭 → 차트 창 열기
-indexBar.addEventListener('click', (e) => {
-  const cell = e.target.closest('.idx');
-  if (!cell || !cell.dataset.key) return;
-  window.api.openStockWindow(cell.dataset.key, cell.dataset.name, 'index');
-});
-
-// ---- 장 운영시간 (현지시간 기준, 시작/마감 전후 경과) ----
-const marketEl = $('#marketHours');
-const MARKET_HOURS = {
-  KOSPI: { name: '코스피', tz: 'Asia/Seoul', open: '09:00', close: '15:30' },
-  IXIC: { name: '나스닥', tz: 'America/New_York', open: '09:30', close: '16:00' },
-  SPX: { name: 'S&P500', tz: 'America/New_York', open: '09:30', close: '16:00' },
-};
-
 function parseHM(s) {
   const [h, m] = s.split(':').map(Number);
   return h * 60 + m;
@@ -323,34 +297,66 @@ function fmtDur(mins) {
   if (h) return `${h}시간`;
   return `${m}분`;
 }
-function relText(nowM, evtM, before, after) {
-  const diff = nowM - evtM;
-  return diff < 0 ? `${before} ${fmtDur(-diff)}` : `${after} ${fmtDur(diff)}`;
+
+// 지수 셀 아래에 들어갈 장 운영시간 HTML
+function marketHoursHtml(key) {
+  const mh = MARKET_HOURS[key];
+  if (!mh) return '';
+  const nowM = nowMinInTZ(mh.tz);
+  const openM = parseHM(mh.open);
+  const closeM = parseHM(mh.close);
+  const beforeOpen = nowM < openM;
+  // 시작 전=빨강(up), 시작 후=파랑(down)
+  const openCls = beforeOpen ? 'up' : 'down';
+  const openTxt = beforeOpen
+    ? `시작 전 ${fmtDur(openM - nowM)}`
+    : `시작 후 ${fmtDur(nowM - openM)}`;
+  let html = `<span class="im-line"><span class="im-t">장시작 ${mh.open}</span> <span class="${openCls}">${openTxt}</span></span>`;
+  // 시작 전이면 마감 정보 숨김
+  if (!beforeOpen) {
+    const closeTxt = nowM < closeM
+      ? `마감 전 ${fmtDur(closeM - nowM)}`
+      : `마감 후 ${fmtDur(nowM - closeM)}`;
+    html += `<span class="im-line"><span class="im-t">마감 ${mh.close}</span> <span class="im-close">${closeTxt}</span></span>`;
+  }
+  return `<span class="idx-mkt">${html}</span>`;
 }
 
-function renderMarketHours() {
-  const rows = Object.values(MARKET_HOURS)
-    .map((m) => {
-      const nowM = nowMinInTZ(m.tz);
-      const openRel = relText(nowM, parseHM(m.open), '시작 전', '시작 후');
-      const closeRel = relText(nowM, parseHM(m.close), '마감 전', '마감 후');
-      return `<div class="mkt-row">
-        <span class="mkt-name">${m.name}</span>
-        <span class="mkt-times">
-          <span class="mkt-line">장시작 ${m.open} · <span class="mkt-rel">${openRel}</span></span>
-          <span class="mkt-line">마감 ${m.close} · <span class="mkt-rel">${closeRel}</span></span>
-        </span>
+function renderIndexBar() {
+  if (!indicesData.length) return;
+  indexBar.innerHTML = indicesData
+    .map((ix) => {
+      const cls = colorClass(ix.changeRate);
+      const sign = ix.changeRate > 0 ? '▲' : ix.changeRate < 0 ? '▼' : '-';
+      const val = ix.error ? '-' : fmt2(ix.price);
+      const rate = ix.error ? '' : `${sign} ${Math.abs(ix.changeRate).toFixed(2)}%`;
+      return `<div class="idx" data-key="${ix.key}" data-name="${ix.name}" title="${ix.name} 차트 보기">
+        <span class="idx-name">${ix.name}</span>
+        <span class="idx-val">${val}</span>
+        <span class="idx-rate ${cls}">${rate}</span>
+        ${marketHoursHtml(ix.key)}
       </div>`;
     })
     .join('');
-  marketEl.innerHTML = `<div class="mkt-title">장 운영시간 (현지시간 기준)</div>${rows}`;
 }
 
+async function loadIndices() {
+  const res = await window.api.getIndices();
+  if (res.ok) indicesData = res.indices;
+  renderIndexBar();
+}
+
+// 지수 클릭 → 차트 창 열기
+indexBar.addEventListener('click', (e) => {
+  const cell = e.target.closest('.idx');
+  if (!cell || !cell.dataset.key) return;
+  window.api.openStockWindow(cell.dataset.key, cell.dataset.name, 'index');
+});
+
 // ---- 초기화 ----
-renderMarketHours();
-setInterval(renderMarketHours, 30000);
 loadIndices();
 setInterval(loadIndices, 20000);
+setInterval(renderIndexBar, 30000); // 경과 시간 갱신
 window.api.getTheme().then(applyTheme);
 window.api.getVersion().then(
   (v) => ($('#appVersion').textContent = `제작 Claudio Lim · v${v}`)

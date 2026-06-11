@@ -32,10 +32,16 @@ const chart = LightweightCharts.createChart(chartEl, {
   crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
 });
 
-const candleSeries = chart.addCandlestickSeries({
-  upColor: '#f23645', downColor: '#2962ff',
-  borderUpColor: '#f23645', borderDownColor: '#2962ff',
-  wickUpColor: '#f23645', wickDownColor: '#2962ff',
+// 시작가를 기준선으로: 위(시작가 초과)=빨강, 아래=파랑
+const priceSeries = chart.addBaselineSeries({
+  baseValue: { type: 'price', price: 0 },
+  lineWidth: 2,
+  topLineColor: '#f23645',
+  topFillColor1: 'rgba(242,54,69,0.30)',
+  topFillColor2: 'rgba(242,54,69,0.03)',
+  bottomLineColor: '#2962ff',
+  bottomFillColor1: 'rgba(41,98,255,0.03)',
+  bottomFillColor2: 'rgba(41,98,255,0.30)',
 });
 const volumeSeries = chart.addHistogramSeries({
   priceFormat: { type: 'volume' },
@@ -43,7 +49,8 @@ const volumeSeries = chart.addHistogramSeries({
 });
 volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
 
-let lastCandle = null;
+let lastPoint = null; // { time, value }
+let startPrice = null; // 시작가(기준선)
 let openLine = null;
 let supportLine = null;
 
@@ -71,11 +78,11 @@ window.addEventListener('resize', resize);
 
 /** 지지선(최근 저점) + 시작가(현재 봉 시가) 수평선 */
 function drawLevelLines(candles) {
-  if (openLine) { candleSeries.removePriceLine(openLine); openLine = null; }
-  if (supportLine) { candleSeries.removePriceLine(supportLine); supportLine = null; }
+  if (openLine) { priceSeries.removePriceLine(openLine); openLine = null; }
+  if (supportLine) { priceSeries.removePriceLine(supportLine); supportLine = null; }
   if (!candles.length) return;
   const last = candles[candles.length - 1];
-  openLine = candleSeries.createPriceLine({
+  openLine = priceSeries.createPriceLine({
     price: last.open,
     color: '#9aa0a6',
     lineWidth: 1,
@@ -85,7 +92,7 @@ function drawLevelLines(candles) {
   });
   const lookback = candles.slice(-20);
   const support = Math.min(...lookback.map((c) => c.low));
-  supportLine = candleSeries.createPriceLine({
+  supportLine = priceSeries.createPriceLine({
     price: support,
     color: '#26a69a',
     lineWidth: 1,
@@ -103,16 +110,20 @@ async function loadChart(period) {
     console.error(res.error);
     return;
   }
-  const candles = res.candles.map((c) => ({
-    time: c.time, open: c.open, high: c.high, low: c.low, close: c.close,
-  }));
-  const volumes = res.candles.map((c) => ({
+  const candles = res.candles;
+  const last = candles[candles.length - 1];
+  // 시작가 = 현재(마지막) 봉의 시가 → 기준선
+  startPrice = last ? last.open : 0;
+  priceSeries.applyOptions({ baseValue: { type: 'price', price: startPrice } });
+
+  const line = candles.map((c) => ({ time: c.time, value: c.close }));
+  const volumes = candles.map((c) => ({
     time: c.time, value: c.volume,
     color: c.close >= c.open ? 'rgba(242,54,69,.5)' : 'rgba(41,98,255,.5)',
   }));
-  candleSeries.setData(candles);
+  priceSeries.setData(line);
   volumeSeries.setData(volumes);
-  lastCandle = candles[candles.length - 1] || null;
+  lastPoint = line[line.length - 1] || null;
   drawLevelLines(candles);
   chart.timeScale().fitContent();
   resize();
@@ -146,15 +157,9 @@ function setPrice(price, change, rate) {
 }
 
 function onTick(price) {
-  if (lastCandle) {
-    lastCandle = {
-      time: lastCandle.time,
-      open: lastCandle.open,
-      high: Math.max(lastCandle.high, price),
-      low: Math.min(lastCandle.low, price),
-      close: price,
-    };
-    candleSeries.update(lastCandle);
+  if (lastPoint) {
+    lastPoint = { time: lastPoint.time, value: price };
+    priceSeries.update(lastPoint);
   }
 }
 

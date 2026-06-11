@@ -145,14 +145,11 @@ input {
 .flash-up { animation: flashUp .7s ease-out; }
 .flash-down { animation: flashDown .7s ease-out; }
 
-/* 장 운영시간 */
-.market-hours { padding: 8px 12px 4px; border-top: 1px solid var(--border); background: var(--panel); }
-.mkt-title { font-size: 10px; color: var(--muted); margin-bottom: 5px; }
-.mkt-row { display: flex; gap: 8px; padding: 3px 0; align-items: flex-start; }
-.mkt-name { width: 48px; flex: none; font-weight: 600; font-size: 11px; }
-.mkt-times { display: flex; flex-direction: column; gap: 1px; font-size: 11px; }
-.mkt-line { font-variant-numeric: tabular-nums; }
-.mkt-rel { color: var(--accent); font-weight: 600; }
+/* 지수 셀 안의 장 운영시간 */
+.idx-mkt { display: flex; flex-direction: column; gap: 1px; margin-top: 3px; }
+.im-line { font-size: 9px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.im-t { color: var(--muted); }
+.im-close { color: var(--muted); }
 
 .status { font-size: 11px; padding: 6px 12px; color: var(--muted); border-top: 1px solid var(--border); }
 .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#999; margin-right:6px; }
