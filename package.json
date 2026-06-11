@@ -2,7 +2,7 @@
   "name": "stock-realtime-viewer",
   "version": "1.0.0",
   "description": "실시간 주식 차트/호가 뷰어 (한국투자증권 KIS API)",
-  "author": "your-name",
+  "author": "Claudio-sys11",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
@@ -40,8 +40,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "YOUR_GITHUB_USERNAME",
-        "repo": "YOUR_REPO_NAME"
+        "owner": "Claudio-sys11",
+        "repo": "stock-realtime-viewer"
       }
     ]
   },
