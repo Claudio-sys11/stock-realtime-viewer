@@ -1,6 +1,6 @@
 {
   "name": "stock-realtime-viewer",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "주식 차트/현재가 뷰어 (네이버 금융 데이터)",
   "author": "Claudio Lim",
   "main": "src/main/main.js",
@@ -24,18 +24,20 @@
     ],
     "win": {
       "target": [
-        {
-          "target": "nsis",
-          "arch": ["x64"]
-        }
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
       ],
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "${productName}-Portable-${version}.${ext}"
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
+      "oneClick": true,
+      "perMachine": false,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}.${ext}"
     },
     "publish": [
       {
