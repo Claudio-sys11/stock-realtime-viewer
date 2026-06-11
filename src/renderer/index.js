@@ -276,7 +276,7 @@ async function loadIndices() {
       const sign = ix.changeRate > 0 ? '▲' : ix.changeRate < 0 ? '▼' : '-';
       const val = ix.error ? '-' : fmt2(ix.price);
       const rate = ix.error ? '' : `${sign} ${Math.abs(ix.changeRate).toFixed(2)}%`;
-      return `<div class="idx">
+      return `<div class="idx" data-key="${ix.key}" data-name="${ix.name}" title="${ix.name} 차트 보기">
         <span class="idx-name">${ix.name}</span>
         <span class="idx-val">${val}</span>
         <span class="idx-rate ${cls}">${rate}</span>
@@ -284,6 +284,13 @@ async function loadIndices() {
     })
     .join('');
 }
+
+// 지수 클릭 → 차트 창 열기
+indexBar.addEventListener('click', (e) => {
+  const cell = e.target.closest('.idx');
+  if (!cell || !cell.dataset.key) return;
+  window.api.openStockWindow(cell.dataset.key, cell.dataset.name, 'index');
+});
 
 // ---- 초기화 ----
 loadIndices();

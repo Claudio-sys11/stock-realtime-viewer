@@ -16,6 +16,14 @@ const HEADERS = {
 
 const TIMEFRAME = { D: 'day', W: 'week', M: 'month' };
 
+// 지수 정의: poll=실시간 폴링 경로, chart=차트 소스
+const INDEX_DEFS = {
+  KOSPI: { name: '코스피', code: 'KOSPI', poll: 'domestic', chart: 'domestic' },
+  IXIC: { name: '나스닥', code: '.IXIC', poll: 'worldstock', chart: 'world' },
+  SPX: { name: 'S&P500', code: '.INX', poll: 'worldstock', chart: 'world' },
+};
+const WORLD_SCT = { D: 'candleDay', W: 'candleWeek', M: 'candleMonth' };
+
 function num(s) {
   if (s == null) return 0;
   const n = Number(String(s).replace(/[,%\s]/g, ''));
@@ -108,37 +116,73 @@ class NaverClient {
     });
   }
 
-  /** 주요 지수 (코스피 / 나스닥 / S&P500) */
+  /** 주요 지수 (코스피 / 나스닥 / S&P500) 현재가 일괄 */
   async getIndices() {
-    const defs = [
-      { key: 'KOSPI', name: '코스피', kind: 'domestic', code: 'KOSPI' },
-      { key: 'IXIC', name: '나스닥', kind: 'worldstock', code: '.IXIC' },
-      { key: 'SPX', name: 'S&P500', kind: 'worldstock', code: '.INX' },
-    ];
     return Promise.all(
-      defs.map(async (d) => {
+      Object.keys(INDEX_DEFS).map(async (key) => {
         try {
-          const url =
-            `https://polling.finance.naver.com/api/realtime/${d.kind}/index/` +
-            encodeURIComponent(d.code);
-          const res = await fetch(url, { headers: HEADERS });
-          const data = await res.json();
-          const x = (data.datas || [])[0] || {};
-          const sig = x.compareToPreviousPrice && x.compareToPreviousPrice.code;
-          const dir = sig === '4' || sig === '5' ? -1 : 1;
-          const rate = num(x.fluctuationsRatio);
-          return {
-            key: d.key,
-            name: d.name,
-            price: num(x.closePrice),
-            change: num(x.compareToPreviousClosePrice),
-            changeRate: rate !== 0 ? dir * Math.abs(rate) : 0,
-          };
+          return await this._fetchIndexQuote(key);
         } catch (_) {
-          return { key: d.key, name: d.name, price: 0, change: 0, changeRate: 0, error: true };
+          const d = INDEX_DEFS[key];
+          return { key, symbol: key, name: d.name, price: 0, change: 0, changeRate: 0, error: true };
         }
       })
     );
+  }
+
+  /** 단일 지수 현재가 */
+  async getIndexQuote(key) {
+    return this._fetchIndexQuote(key);
+  }
+
+  async _fetchIndexQuote(key) {
+    const d = INDEX_DEFS[key];
+    if (!d) throw new Error('알 수 없는 지수');
+    const url =
+      `https://polling.finance.naver.com/api/realtime/${d.poll}/index/` +
+      encodeURIComponent(d.code);
+    const res = await fetch(url, { headers: HEADERS });
+    if (!res.ok) throw new Error(`지수 조회 실패 (${res.status})`);
+    const data = await res.json();
+    const x = (data.datas || [])[0] || {};
+    const sig = x.compareToPreviousPrice && x.compareToPreviousPrice.code;
+    const dir = sig === '4' || sig === '5' ? -1 : 1;
+    const rate = num(x.fluctuationsRatio);
+    return {
+      key,
+      symbol: key,
+      name: d.name,
+      price: num(x.closePrice),
+      change: num(x.compareToPreviousClosePrice),
+      changeRate: rate !== 0 ? dir * Math.abs(rate) : 0,
+    };
+  }
+
+  /** 지수 차트 (일/주/월) */
+  async getIndexChart(key, period = 'D') {
+    const d = INDEX_DEFS[key];
+    if (!d) throw new Error('알 수 없는 지수');
+    // 코스피는 종목과 동일한 siseJson 사용
+    if (d.chart === 'domestic') return this.getDailyChart(d.code, period);
+    // 해외 지수
+    const sct = WORLD_SCT[period] || 'candleDay';
+    const url =
+      'https://m.stock.naver.com/front-api/chart/pricesByPeriod' +
+      `?reutersCode=${encodeURIComponent(d.code)}&category=major&chartInfoType=index&scriptChartType=${sct}`;
+    const res = await fetch(url, { headers: HEADERS });
+    if (!res.ok) throw new Error(`지수 차트 실패 (${res.status})`);
+    const data = await res.json();
+    const rows = (data.result && data.result.priceInfos) || [];
+    return rows
+      .filter((r) => r.localDate)
+      .map((r) => ({
+        time: this._toIso(r.localDate),
+        open: num(r.openPrice),
+        high: num(r.highPrice),
+        low: num(r.lowPrice),
+        close: num(r.closePrice),
+        volume: num(r.accumulatedTradingVolume),
+      }));
   }
 
   /** 종목명/코드 검색 */

@@ -3,20 +3,28 @@
 const params = new URLSearchParams(location.search);
 const SYMBOL = params.get('symbol');
 const NAME = params.get('name') || SYMBOL;
+const IS_INDEX = params.get('type') === 'index';
 
 const $ = (s) => document.querySelector(s);
-const fmt = (n) => Number(n).toLocaleString('ko-KR');
+const fmt = (n) =>
+  IS_INDEX
+    ? Number(n).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : Number(n).toLocaleString('ko-KR');
 const cssVar = (name) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 $('#nm').textContent = NAME;
-$('#cd').textContent = ` ${SYMBOL}`;
-document.title = `${NAME} (${SYMBOL})`;
+$('#cd').textContent = IS_INDEX ? '' : ` ${SYMBOL}`;
+document.title = IS_INDEX ? NAME : `${NAME} (${SYMBOL})`;
 
-// 네이버 금융 페이지를 Chrome으로 열기
-$('#naverLink').addEventListener('click', () => {
-  window.api.openExternal(`https://finance.naver.com/item/main.naver?code=${SYMBOL}`);
-});
+// 네이버 링크: 종목만 Chrome으로 열기 (지수는 숨김)
+if (IS_INDEX) {
+  $('#naverLink').style.display = 'none';
+} else {
+  $('#naverLink').addEventListener('click', () => {
+    window.api.openExternal(`https://finance.naver.com/item/main.naver?code=${SYMBOL}`);
+  });
+}
 
 // ---------------- 차트 ----------------
 const chartEl = $('#chart');
@@ -36,6 +44,8 @@ const volumeSeries = chart.addHistogramSeries({
 volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
 
 let lastCandle = null;
+let openLine = null;
+let supportLine = null;
 
 function applyChartTheme() {
   chart.applyOptions({
@@ -59,8 +69,36 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 
+/** 지지선(최근 저점) + 시작가(현재 봉 시가) 수평선 */
+function drawLevelLines(candles) {
+  if (openLine) { candleSeries.removePriceLine(openLine); openLine = null; }
+  if (supportLine) { candleSeries.removePriceLine(supportLine); supportLine = null; }
+  if (!candles.length) return;
+  const last = candles[candles.length - 1];
+  openLine = candleSeries.createPriceLine({
+    price: last.open,
+    color: '#9aa0a6',
+    lineWidth: 1,
+    lineStyle: LightweightCharts.LineStyle.Dashed,
+    axisLabelVisible: true,
+    title: '시작가',
+  });
+  const lookback = candles.slice(-20);
+  const support = Math.min(...lookback.map((c) => c.low));
+  supportLine = candleSeries.createPriceLine({
+    price: support,
+    color: '#26a69a',
+    lineWidth: 1,
+    lineStyle: LightweightCharts.LineStyle.Dashed,
+    axisLabelVisible: true,
+    title: '지지선',
+  });
+}
+
 async function loadChart(period) {
-  const res = await window.api.getDailyChart(SYMBOL, period);
+  const res = IS_INDEX
+    ? await window.api.getIndexChart(SYMBOL, period)
+    : await window.api.getDailyChart(SYMBOL, period);
   if (!res.ok) {
     console.error(res.error);
     return;
@@ -75,6 +113,7 @@ async function loadChart(period) {
   candleSeries.setData(candles);
   volumeSeries.setData(volumes);
   lastCandle = candles[candles.length - 1] || null;
+  drawLevelLines(candles);
   chart.timeScale().fitContent();
   resize();
 }
@@ -106,21 +145,37 @@ function setPrice(price, change, rate) {
   lastPrice = price;
 }
 
-// ---------------- 실시간(폴링) 수신 ----------------
-window.api.onRealtime(({ symbol, type, payload }) => {
-  if (symbol !== SYMBOL || type !== 'trade') return;
-  setPrice(payload.price, payload.change, payload.changeRate);
+function onTick(price) {
   if (lastCandle) {
     lastCandle = {
       time: lastCandle.time,
       open: lastCandle.open,
-      high: Math.max(lastCandle.high, payload.price),
-      low: Math.min(lastCandle.low, payload.price),
-      close: payload.price,
+      high: Math.max(lastCandle.high, price),
+      low: Math.min(lastCandle.low, price),
+      close: price,
     };
     candleSeries.update(lastCandle);
   }
-});
+}
+
+// ---------------- 실시간 ----------------
+if (IS_INDEX) {
+  // 지수는 렌더러에서 직접 폴링
+  async function pollIndex() {
+    const q = await window.api.getIndexQuote(SYMBOL);
+    if (q.ok) {
+      setPrice(q.quote.price, q.quote.change, q.quote.changeRate);
+      onTick(q.quote.price);
+    }
+  }
+  setInterval(pollIndex, 8000);
+} else {
+  window.api.onRealtime(({ symbol, type, payload }) => {
+    if (symbol !== SYMBOL || type !== 'trade') return;
+    setPrice(payload.price, payload.change, payload.changeRate);
+    onTick(payload.price);
+  });
+}
 
 // 테마 변경 반영
 window.api.onThemeChange((t) => applyTheme(t));
@@ -130,7 +185,9 @@ window.api.onThemeChange((t) => applyTheme(t));
   const theme = await window.api.getTheme();
   applyTheme(theme);
   await loadChart('D');
-  const q = await window.api.getQuote(SYMBOL);
+  const q = IS_INDEX
+    ? await window.api.getIndexQuote(SYMBOL)
+    : await window.api.getQuote(SYMBOL);
   if (q.ok) setPrice(q.quote.price, q.quote.change, q.quote.changeRate);
-  await window.api.subscribe(SYMBOL);
+  if (!IS_INDEX) await window.api.subscribe(SYMBOL);
 })();

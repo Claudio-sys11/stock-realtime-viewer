@@ -43,8 +43,8 @@ function createMainWindow() {
   });
 }
 
-/** 종목 차트 창 열기 (이미 있으면 포커스) */
-function openStockWindow(symbol, name) {
+/** 종목/지수 차트 창 열기 (이미 있으면 포커스) */
+function openStockWindow(symbol, name, type) {
   if (stockWindows.has(symbol)) {
     const w = stockWindows.get(symbol);
     if (!w.isDestroyed()) {
@@ -57,7 +57,7 @@ function openStockWindow(symbol, name) {
   const win = new BrowserWindow({
     width: 880,
     height: 620,
-    title: `${name || symbol} (${symbol})`,
+    title: type === 'index' ? `${name}` : `${name || symbol} (${symbol})`,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       contextIsolation: true,
@@ -67,6 +67,7 @@ function openStockWindow(symbol, name) {
   const url = new URL(`file://${path.join(__dirname, '..', 'renderer', 'stock.html')}`);
   url.searchParams.set('symbol', symbol);
   url.searchParams.set('name', name || symbol);
+  url.searchParams.set('type', type === 'index' ? 'index' : 'stock');
   win.loadURL(url.toString());
   if (isDev) win.webContents.openDevTools({ mode: 'detach' });
 
@@ -165,8 +166,8 @@ function registerIpc() {
     return { ok: true };
   });
 
-  ipcMain.handle('window:openStock', (_e, { symbol, name }) => {
-    openStockWindow(symbol, name);
+  ipcMain.handle('window:openStock', (_e, { symbol, name, type }) => {
+    openStockWindow(symbol, name, type);
     return { ok: true };
   });
 
@@ -190,6 +191,22 @@ function registerIpc() {
   ipcMain.handle('indices:get', async () => {
     try {
       return { ok: true, indices: await naver.getIndices() };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('indexChart:get', async (_e, { key, period }) => {
+    try {
+      return { ok: true, candles: await naver.getIndexChart(key, period || 'D') };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('indexQuote:get', async (_e, key) => {
+    try {
+      return { ok: true, quote: await naver.getIndexQuote(key) };
     } catch (e) {
       return { ok: false, error: e.message };
     }

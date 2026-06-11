@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('api', {
 
   // 주요 지수 (코스피/나스닥/S&P500)
   getIndices: () => ipcRenderer.invoke('indices:get'),
+  getIndexChart: (key, period) => ipcRenderer.invoke('indexChart:get', { key, period }),
+  getIndexQuote: (key) => ipcRenderer.invoke('indexQuote:get', key),
 
   // 관심종목
   getWatchlist: () => ipcRenderer.invoke('watchlist:get'),
@@ -19,8 +21,8 @@ contextBridge.exposeInMainWorld('api', {
   removeWatch: (symbol) => ipcRenderer.invoke('watchlist:remove', symbol),
 
   // 창
-  openStockWindow: (symbol, name) =>
-    ipcRenderer.invoke('window:openStock', { symbol, name }),
+  openStockWindow: (symbol, name, type) =>
+    ipcRenderer.invoke('window:openStock', { symbol, name, type }),
 
   // 데이터
   getDailyChart: (symbol, period) =>
