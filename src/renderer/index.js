@@ -292,7 +292,63 @@ indexBar.addEventListener('click', (e) => {
   window.api.openStockWindow(cell.dataset.key, cell.dataset.name, 'index');
 });
 
+// ---- 장 운영시간 (현지시간 기준, 시작/마감 전후 경과) ----
+const marketEl = $('#marketHours');
+const MARKET_HOURS = {
+  KOSPI: { name: '코스피', tz: 'Asia/Seoul', open: '09:00', close: '15:30' },
+  IXIC: { name: '나스닥', tz: 'America/New_York', open: '09:30', close: '16:00' },
+  SPX: { name: 'S&P500', tz: 'America/New_York', open: '09:30', close: '16:00' },
+};
+
+function parseHM(s) {
+  const [h, m] = s.split(':').map(Number);
+  return h * 60 + m;
+}
+function nowMinInTZ(tz) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date());
+  let h = 0, m = 0;
+  for (const p of parts) {
+    if (p.type === 'hour') h = Number(p.value);
+    if (p.type === 'minute') m = Number(p.value);
+  }
+  return (h % 24) * 60 + m;
+}
+function fmtDur(mins) {
+  mins = Math.max(0, Math.round(mins));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h && m) return `${h}시간 ${m}분`;
+  if (h) return `${h}시간`;
+  return `${m}분`;
+}
+function relText(nowM, evtM, before, after) {
+  const diff = nowM - evtM;
+  return diff < 0 ? `${before} ${fmtDur(-diff)}` : `${after} ${fmtDur(diff)}`;
+}
+
+function renderMarketHours() {
+  const rows = Object.values(MARKET_HOURS)
+    .map((m) => {
+      const nowM = nowMinInTZ(m.tz);
+      const openRel = relText(nowM, parseHM(m.open), '시작 전', '시작 후');
+      const closeRel = relText(nowM, parseHM(m.close), '마감 전', '마감 후');
+      return `<div class="mkt-row">
+        <span class="mkt-name">${m.name}</span>
+        <span class="mkt-times">
+          <span class="mkt-line">장시작 ${m.open} · <span class="mkt-rel">${openRel}</span></span>
+          <span class="mkt-line">마감 ${m.close} · <span class="mkt-rel">${closeRel}</span></span>
+        </span>
+      </div>`;
+    })
+    .join('');
+  marketEl.innerHTML = `<div class="mkt-title">장 운영시간 (현지시간 기준)</div>${rows}`;
+}
+
 // ---- 초기화 ----
+renderMarketHours();
+setInterval(renderMarketHours, 30000);
 loadIndices();
 setInterval(loadIndices, 20000);
 window.api.getTheme().then(applyTheme);

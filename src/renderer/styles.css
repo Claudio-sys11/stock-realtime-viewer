@@ -145,6 +145,15 @@ input {
 .flash-up { animation: flashUp .7s ease-out; }
 .flash-down { animation: flashDown .7s ease-out; }
 
+/* 장 운영시간 */
+.market-hours { padding: 8px 12px 4px; border-top: 1px solid var(--border); background: var(--panel); }
+.mkt-title { font-size: 10px; color: var(--muted); margin-bottom: 5px; }
+.mkt-row { display: flex; gap: 8px; padding: 3px 0; align-items: flex-start; }
+.mkt-name { width: 48px; flex: none; font-weight: 600; font-size: 11px; }
+.mkt-times { display: flex; flex-direction: column; gap: 1px; font-size: 11px; }
+.mkt-line { font-variant-numeric: tabular-nums; }
+.mkt-rel { color: var(--accent); font-weight: 600; }
+
 .status { font-size: 11px; padding: 6px 12px; color: var(--muted); border-top: 1px solid var(--border); }
 .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#999; margin-right:6px; }
 .dot.connected { background:#2ea043; }
