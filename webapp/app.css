@@ -80,6 +80,7 @@ body {
 .foot { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between;
   padding: 8px 14px calc(8px + env(safe-area-inset-bottom)); font-size: 11px; color: var(--muted);
   background: var(--panel); border-top: 1px solid var(--border); }
+.vlink { color: var(--accent); text-decoration: none; }
 
 /* 차트 오버레이 */
 .chart-view { position: fixed; inset: 0; background: var(--bg); z-index: 50; display: none; flex-direction: column;

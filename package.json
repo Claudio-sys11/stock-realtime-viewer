@@ -1,6 +1,6 @@
 {
   "name": "stock-realtime-viewer",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "description": "주식 차트/현재가 뷰어 (네이버 금융 데이터)",
   "author": "Claudio Lim",
   "main": "src/main/main.js",

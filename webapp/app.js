@@ -224,6 +224,16 @@ async function loadFx() {
   try { fxRate = await NV.getUsdKrw(); renderWatch(); } catch (_) {}
 }
 
+// 최신 릴리스 버전 표시 (Windows 업데이트 시 자동 동기화). GitHub API는 CORS 허용.
+async function loadVersion() {
+  try {
+    const r = await fetch('https://api.github.com/repos/Claudio-sys11/stock-realtime-viewer/releases/latest', { headers: { Accept: 'application/vnd.github+json' } });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j.tag_name) $('#ver').textContent = `${j.tag_name} ↓`;
+  } catch (_) {}
+}
+
 function addStock(item) {
   const it = { symbol: item.code || item.symbol, name: item.name, market: item.market === 'US' ? 'US' : 'KR', apiCode: item.apiCode || item.code };
   if (!watch.find((x) => x.symbol === it.symbol)) { watch.push(it); saveWatch(); renderWatch(); }
@@ -335,6 +345,7 @@ renderWatch();
 loadIndices(); setInterval(loadIndices, 20000);
 setInterval(renderIndexBar, 30000); // 경과 시간 갱신
 loadFx(); setInterval(loadFx, 60000);
+loadVersion();
 pollWatch(); setInterval(pollWatch, 5000);
 
 if ('serviceWorker' in navigator) {
