@@ -51,22 +51,71 @@ function renderSparkline(svg, closes, startPrice) {
     `<path d="${blue.join('')}" fill="none" stroke="#2962ff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
 }
 
-// ---------------- 지수 바 ----------------
-async function loadIndices() {
-  let list;
-  try { list = await NV.getIndices(); } catch (_) { return; }
-  $('#indexBar').innerHTML = list.map((ix) => {
+// ---------------- 장 운영시간 ----------------
+const MARKET_HOURS = {
+  KOSPI: { tz: 'Asia/Seoul', sessions: [
+    { label: 'KRX', open: '09:00', close: '15:30' },
+    { label: 'NXT', open: '08:00', close: '20:00' },
+  ] },
+  IXIC: { tz: 'America/New_York', sessions: [{ open: '09:30', close: '16:00' }] },
+  SPX: { tz: 'America/New_York', sessions: [{ open: '09:30', close: '16:00' }] },
+};
+function parseHM(s) { const [h, m] = s.split(':').map(Number); return h * 60 + m; }
+function nowMinInTZ(tz) {
+  const p = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+  let h = 0, m = 0;
+  for (const x of p) { if (x.type === 'hour') h = +x.value; if (x.type === 'minute') m = +x.value; }
+  return (h % 24) * 60 + m;
+}
+function fmtDur(mins) {
+  mins = Math.max(0, Math.round(mins));
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h && m ? `${h}시간 ${m}분` : h ? `${h}시간` : `${m}분`;
+}
+function sessionHtml(tz, s) {
+  const nowM = nowMinInTZ(tz), openM = parseHM(s.open), closeM = parseHM(s.close);
+  const beforeOpen = nowM < openM, isOpen = nowM >= openM && nowM < closeM;
+  const lbl = s.label ? `<b>${s.label}</b> ` : '';
+  const openCls = beforeOpen ? 'up' : 'down';
+  const openTxt = beforeOpen ? `시작 전 ${fmtDur(openM - nowM)}` : `시작 후 ${fmtDur(nowM - openM)}`;
+  let html = `<span class="im-line">${lbl}<span class="im-t">장시작 ${s.open}</span> <span class="${openCls}">${openTxt}</span></span>`;
+  if (!beforeOpen) {
+    const m2c = closeM - nowM;
+    const closeTxt = m2c > 0 ? `마감 전 ${fmtDur(m2c)}` : `마감 후 ${fmtDur(-m2c)}`;
+    const closingSoon = m2c > 0 && m2c <= 30;
+    html += `<span class="im-line${closingSoon ? ' mkt-closing' : ''}">${lbl}<span class="im-t">마감 ${s.close}</span> <span class="im-close">${closeTxt}</span></span>`;
+  }
+  return `<span class="mkt-session${isOpen ? '' : ' mkt-closed'}">${html}</span>`;
+}
+function marketHoursHtml(key) {
+  const mh = MARKET_HOURS[key];
+  if (!mh) return '';
+  return `<div class="idx-mkt">${mh.sessions.map((s) => sessionHtml(mh.tz, s)).join('')}</div>`;
+}
+
+// ---------------- 지수 바 (상하 배치) ----------------
+let indicesData = [];
+function renderIndexBar() {
+  if (!indicesData.length) return;
+  $('#indexBar').innerHTML = indicesData.map((ix) => {
     const cls = colorClass(ix.changeRate);
     const sign = ix.changeRate > 0 ? '▲' : ix.changeRate < 0 ? '▼' : '-';
-    return `<div class="idx" data-key="${ix.key}" data-name="${ix.name}">
-      <div class="idx-name">${ix.name}</div>
-      <div class="idx-val">${ix.error ? '-' : fmtN(ix.price, true)}</div>
-      <div class="idx-rate ${cls}">${ix.error ? '' : sign + ' ' + Math.abs(ix.changeRate).toFixed(2) + '%'}</div>
+    return `<div class="idx-row" data-key="${ix.key}" data-name="${ix.name}">
+      <div class="idx-head">
+        <span class="idx-name">${ix.name}</span>
+        <span class="idx-val">${ix.error ? '-' : fmtN(ix.price, true)}</span>
+        <span class="idx-rate ${cls}">${ix.error ? '' : sign + ' ' + Math.abs(ix.changeRate).toFixed(2) + '%'}</span>
+      </div>
+      ${marketHoursHtml(ix.key)}
     </div>`;
   }).join('');
 }
+async function loadIndices() {
+  try { indicesData = await NV.getIndices(); } catch (_) {}
+  renderIndexBar();
+}
 $('#indexBar').addEventListener('click', (e) => {
-  const c = e.target.closest('.idx');
+  const c = e.target.closest('.idx-row');
   if (c) openChart({ type: 'index', symbol: c.dataset.key, name: c.dataset.name });
 });
 
@@ -256,6 +305,7 @@ document.querySelectorAll('.cv-tabs button').forEach((btn) => {
 tickClock(); setInterval(tickClock, 1000);
 renderWatch();
 loadIndices(); setInterval(loadIndices, 20000);
+setInterval(renderIndexBar, 30000); // 경과 시간 갱신
 loadFx(); setInterval(loadFx, 60000);
 pollWatch(); setInterval(pollWatch, 5000);
 

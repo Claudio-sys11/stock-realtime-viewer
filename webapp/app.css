@@ -16,12 +16,30 @@ body {
 .topbar .title { font-size: 17px; font-weight: 800; }
 .topbar .sub { font-size: 11px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
 
-.index-bar { display: flex; border-bottom: 1px solid var(--border); background: var(--panel); }
-.idx { flex: 1; padding: 8px 8px; border-right: 1px solid var(--border); }
-.idx:last-child { border-right: none; }
-.idx-name { font-size: 11px; color: var(--muted); }
-.idx-val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.idx-rate { font-size: 11px; font-variant-numeric: tabular-nums; }
+/* 지수: 모바일은 상하(세로) 배치 */
+.index-bar { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); background: var(--panel); }
+.idx-row { padding: 9px 14px; border-bottom: 1px solid var(--border); }
+.idx-row:last-child { border-bottom: none; }
+.idx-head { display: flex; align-items: baseline; gap: 8px; }
+.idx-name { font-size: 12px; color: var(--muted); width: 52px; flex: none; }
+.idx-val { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.idx-rate { font-size: 12px; font-variant-numeric: tabular-nums; margin-left: auto; }
+
+/* 장 운영시간 */
+.idx-mkt { display: flex; flex-wrap: wrap; gap: 3px 12px; margin-top: 4px; }
+.mkt-session { display: flex; flex-direction: column; gap: 1px; border-radius: 4px; padding: 2px 5px; }
+.mkt-closed { background: rgba(128, 128, 128, 0.18); opacity: 0.6; }
+.im-line { font-size: 10px; line-height: 1.35; white-space: nowrap; }
+.im-line b { color: var(--text); font-weight: 700; }
+.im-t { color: var(--muted); }
+.im-close { color: var(--muted); }
+/* 마감 30분 전: 빨간 네온 깜빡임 */
+.mkt-closing, .mkt-closing .im-t, .mkt-closing .im-close, .mkt-closing b { color: #ff2d2d !important; font-weight: 700; }
+.mkt-closing { animation: neonBlink 1s ease-in-out infinite; }
+@keyframes neonBlink {
+  0%, 100% { opacity: 1; text-shadow: 0 0 3px #ff2d2d, 0 0 7px #ff2d2d, 0 0 12px rgba(255, 45, 45, .8); }
+  50% { opacity: 0.45; text-shadow: 0 0 1px #ff2d2d; }
+}
 
 .search { position: relative; padding: 10px 14px; }
 .search input {
