@@ -1,6 +1,14 @@
+/* 라이트(기본) */
 :root {
+  --bg: #ffffff; --panel: #f6f7f9; --panel2: #eef0f3; --border: #dfe3e8;
+  --text: #1b1f24; --muted: #6b7280; --up: #e02424; --down: #1d4ed8; --accent: #2563eb;
+  --chart-bg: #ffffff; --chart-grid: #eef0f3;
+}
+/* 다크 */
+[data-theme="dark"] {
   --bg: #0e1116; --panel: #161b22; --panel2: #1c232c; --border: #2a323d;
   --text: #e6edf3; --muted: #8b949e; --up: #f23645; --down: #2962ff; --accent: #2f81f7;
+  --chart-bg: #0e1116; --chart-grid: #1c232c;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; }
@@ -12,7 +20,9 @@ body {
 .up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--muted); }
 .muted { color: var(--muted); }
 
-.topbar { padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--panel); position: sticky; top: 0; z-index: 5; }
+.topbar { padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--panel); position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: space-between; }
+.theme-btn { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 7px 11px; font-size: 15px; }
 .topbar .title { font-size: 17px; font-weight: 800; }
 .topbar .sub { font-size: 11px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
 

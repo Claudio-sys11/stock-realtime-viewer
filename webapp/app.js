@@ -46,10 +46,36 @@ function renderSparkline(svg, closes, startPrice) {
   }
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   svg.innerHTML =
-    `<line x1="${pad}" y1="${baseY.toFixed(1)}" x2="${w - pad}" y2="${baseY.toFixed(1)}" stroke="#2a323d" stroke-width="0.8" stroke-dasharray="2 2"/>` +
-    `<path d="${red.join('')}" fill="none" stroke="#f23645" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>` +
-    `<path d="${blue.join('')}" fill="none" stroke="#2962ff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+    `<line x1="${pad}" y1="${baseY.toFixed(1)}" x2="${w - pad}" y2="${baseY.toFixed(1)}" stroke="var(--border)" stroke-width="0.8" stroke-dasharray="2 2"/>` +
+    `<path d="${red.join('')}" fill="none" stroke="var(--up)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<path d="${blue.join('')}" fill="none" stroke="var(--down)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
 }
+
+// ---------------- 테마 (흰색 기본 / 검은색) ----------------
+const cv = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function applyChartTheme() {
+  if (!chart) return;
+  chart.applyOptions({
+    layout: { background: { color: cv('--chart-bg') }, textColor: cv('--muted') },
+    grid: { vertLines: { color: cv('--chart-grid') }, horzLines: { color: cv('--chart-grid') } },
+    rightPriceScale: { borderColor: cv('--border') },
+    timeScale: { borderColor: cv('--border') },
+  });
+}
+function applyTheme(t) {
+  const dark = t === 'dark';
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  const btn = $('#themeToggle');
+  if (btn) btn.textContent = dark ? '☀️' : '🌙';
+  const meta = document.querySelector('meta[name=theme-color]');
+  if (meta) meta.content = dark ? '#0e1116' : '#ffffff';
+  applyChartTheme();
+}
+$('#themeToggle').addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme', next);
+  applyTheme(next);
+});
 
 // ---------------- 장 운영시간 ----------------
 const MARKET_HOURS = {
@@ -237,6 +263,7 @@ function ensureChart() {
   });
   volSeries = chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: '' });
   volSeries.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+  applyChartTheme();
 }
 function cvResize() { const el = $('#chart'); chart.applyOptions({ width: el.clientWidth, height: el.clientHeight }); }
 window.addEventListener('resize', () => { if (chart && $('#chartView').classList.contains('show')) cvResize(); });
@@ -302,6 +329,7 @@ document.querySelectorAll('.cv-tabs button').forEach((btn) => {
 });
 
 // ---------------- 초기화 ----------------
+applyTheme(localStorage.getItem('theme') || 'light'); // 기본 흰색
 tickClock(); setInterval(tickClock, 1000);
 renderWatch();
 loadIndices(); setInterval(loadIndices, 20000);
