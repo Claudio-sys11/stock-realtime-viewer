@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('api', {
   getWatchlist: () => ipcRenderer.invoke('watchlist:get'),
   addWatch: (input) => ipcRenderer.invoke('watchlist:add', input),
   removeWatch: (symbol) => ipcRenderer.invoke('watchlist:remove', symbol),
+  reorderWatch: (symbols) => ipcRenderer.invoke('watchlist:reorder', symbols),
 
   // 창 (item: {symbol, name, type, market, apiCode})
   openStockWindow: (symbol, name, type, market, apiCode) =>

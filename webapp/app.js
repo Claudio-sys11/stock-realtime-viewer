@@ -145,6 +145,39 @@ $('#indexBar').addEventListener('click', (e) => {
   if (c) openChart({ type: 'index', symbol: c.dataset.key, name: c.dataset.name });
 });
 
+// ---------------- 드래그 정렬 (터치/마우스) ----------------
+let dragItem = null;
+function startDrag(e, li) {
+  e.preventDefault();
+  dragItem = li;
+  li.classList.add('dragging');
+  document.addEventListener('pointermove', onDragMove);
+  document.addEventListener('pointerup', endDrag, { once: true });
+}
+function onDragMove(e) {
+  if (!dragItem) return;
+  e.preventDefault();
+  const wl = $('#watchlist');
+  const els = [...wl.querySelectorAll('.w-item:not(.dragging)')];
+  let after = null, closest = -Infinity;
+  for (const c of els) {
+    const b = c.getBoundingClientRect();
+    const o = e.clientY - b.top - b.height / 2;
+    if (o < 0 && o > closest) { closest = o; after = c; }
+  }
+  if (after == null) wl.appendChild(dragItem);
+  else wl.insertBefore(dragItem, after);
+}
+function endDrag() {
+  document.removeEventListener('pointermove', onDragMove);
+  if (!dragItem) return;
+  dragItem.classList.remove('dragging');
+  dragItem = null;
+  const order = [...$('#watchlist').querySelectorAll('.w-item')].map((li) => li.dataset.symbol);
+  watch.sort((a, b) => order.indexOf(a.symbol) - order.indexOf(b.symbol));
+  saveWatch();
+}
+
 // ---------------- 관심종목 ----------------
 function renderWatch() {
   const el = $('#watchlist');
@@ -155,13 +188,14 @@ function renderWatch() {
       <svg class="w-spark"></svg>
       <div class="w-right"><div class="w-px">-</div><div class="w-krw"></div><div class="w-rate flat">-</div></div>
       <button class="w-del" title="삭제">×</button>
+      <button class="w-handle" title="순서 변경">⠿</button>
     </li>`;
   }).join('');
   el.querySelectorAll('.w-item').forEach((li) => {
     const sym = li.dataset.symbol;
     const it = watch.find((x) => x.symbol === sym);
     li.addEventListener('click', (e) => {
-      if (e.target.classList.contains('w-del')) return;
+      if (e.target.classList.contains('w-del') || e.target.classList.contains('w-handle')) return;
       openChart({ type: 'stock', symbol: it.symbol, name: it.name, market: it.market, apiCode: it.apiCode });
     });
     li.querySelector('.w-del').addEventListener('click', (e) => {
@@ -169,6 +203,7 @@ function renderWatch() {
       watch = watch.filter((x) => x.symbol !== sym);
       saveWatch(); renderWatch();
     });
+    li.querySelector('.w-handle').addEventListener('pointerdown', (e) => startDrag(e, li));
     // 초기 시세 + 스파크라인
     NV.getQuote(it).then((q) => setRow(sym, q.price, q.change, q.changeRate)).catch(() => {});
     loadSpark(it);

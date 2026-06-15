@@ -189,6 +189,11 @@ function registerIpc() {
     return { ok: true };
   });
 
+  ipcMain.handle('watchlist:reorder', (_e, symbols) => {
+    store.reorderWatchlist(symbols || []);
+    return { ok: true };
+  });
+
   ipcMain.handle('window:openStock', (_e, { symbol, name, type, market, apiCode }) => {
     openStockWindow(symbol, name, type, market, apiCode);
     return { ok: true };

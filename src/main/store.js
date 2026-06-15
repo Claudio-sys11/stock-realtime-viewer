@@ -58,6 +58,17 @@ class Store {
     );
     this._save();
   }
+
+  /** 주어진 심볼 순서대로 관심종목 재정렬 */
+  reorderWatchlist(symbols) {
+    const cur = this.data.watchlist || [];
+    const map = new Map(cur.map((x) => [x.symbol, x]));
+    const next = [];
+    for (const s of symbols) if (map.has(s)) next.push(map.get(s));
+    for (const x of cur) if (!symbols.includes(x.symbol)) next.push(x); // 누락 방지
+    this.data.watchlist = next;
+    this._save();
+  }
 }
 
 module.exports = { Store };

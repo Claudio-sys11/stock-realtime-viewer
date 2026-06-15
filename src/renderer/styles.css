@@ -123,6 +123,8 @@ input {
   cursor: pointer;
 }
 .watch-item:hover { background: var(--panel2); }
+.watch-item { cursor: grab; }
+.watch-item.dragging { opacity: 0.45; background: var(--panel2); cursor: grabbing; }
 .wi-info { flex: 1; min-width: 0; }
 .wi-info .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wi-info .code { color: var(--muted); font-size: 11px; }

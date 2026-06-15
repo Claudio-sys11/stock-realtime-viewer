@@ -5,6 +5,30 @@ const $ = (sel) => document.querySelector(sel);
 const watchEl = $('#watchlist');
 const items = new Map(); // symbol → {el, spark, closes, lastPrice}
 
+// ---- 드래그 정렬 ----
+let dragEl = null;
+function dragAfter(y) {
+  const els = [...watchEl.querySelectorAll('.watch-item:not(.dragging)')];
+  let closest = { offset: -Infinity, el: null };
+  for (const child of els) {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) closest = { offset, el: child };
+  }
+  return closest.el;
+}
+function persistWatchOrder() {
+  const order = [...watchEl.querySelectorAll('.watch-item')].map((li) => li.dataset.symbol);
+  window.api.reorderWatch(order);
+}
+watchEl.addEventListener('dragover', (e) => {
+  if (!dragEl) return;
+  e.preventDefault();
+  const after = dragAfter(e.clientY);
+  if (after == null) watchEl.appendChild(dragEl);
+  else watchEl.insertBefore(dragEl, after);
+});
+
 function fmt(n) {
   return Number(n).toLocaleString('ko-KR');
 }
@@ -116,6 +140,18 @@ function renderItem(item) {
       </div>
       <button class="del" title="삭제">×</button>
     </div>`;
+
+  // 드래그로 순서 변경
+  li.draggable = true;
+  li.addEventListener('dragstart', () => {
+    dragEl = li;
+    setTimeout(() => li.classList.add('dragging'), 0);
+  });
+  li.addEventListener('dragend', () => {
+    li.classList.remove('dragging');
+    dragEl = null;
+    persistWatchOrder();
+  });
 
   li.addEventListener('click', (e) => {
     if (e.target.classList.contains('del')) return;

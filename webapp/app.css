@@ -76,6 +76,8 @@ body {
 .w-krw { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .w-rate { font-size: 12px; font-variant-numeric: tabular-nums; }
 .w-del { background: none; border: none; color: var(--muted); font-size: 22px; padding: 0 4px; }
+.w-handle { background: none; border: none; color: var(--muted); font-size: 20px; padding: 0 4px; cursor: grab; touch-action: none; }
+.w-item.dragging { opacity: 0.6; background: var(--panel2); }
 
 .foot { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between;
   padding: 8px 14px calc(8px + env(safe-area-inset-bottom)); font-size: 11px; color: var(--muted);
