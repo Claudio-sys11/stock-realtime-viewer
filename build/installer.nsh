@@ -28,3 +28,12 @@
     ${EndIf}
   ${EndIf}
 !macroend
+
+; 설치/업데이트 시 바탕화면 바로가기를 '실제(리디렉션된) 바탕화면'에 항상 생성
+; (OneDrive 백업 등으로 바탕화면이 이동된 환경 대응)
+!macro customInstall
+  ReadRegStr $0 HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders" "Desktop"
+  ${If} $0 != ""
+    CreateShortcut "$0\${PRODUCT_NAME}.lnk" "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+  ${EndIf}
+!macroend
