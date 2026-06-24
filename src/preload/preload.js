@@ -65,4 +65,5 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   getVersion: () => ipcRenderer.invoke('app:version'),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
 });

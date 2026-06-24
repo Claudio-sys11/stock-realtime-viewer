@@ -275,8 +275,13 @@ window.api.onWsStatus(({ status, detail }) => {
 });
 
 window.api.onUpdate((u) => {
-  if (u.type === 'available') $('#wsText').textContent = '새 업데이트 다운로드 중...';
-  if (u.type === 'downloaded') $('#wsText').textContent = '업데이트 준비됨 — 재시작 대기';
+  const t = $('#wsText');
+  if (u.type === 'checking') t.textContent = '업데이트 확인 중...';
+  else if (u.type === 'available') t.textContent = `새 버전 발견 — 다운로드 중...`;
+  else if (u.type === 'progress') t.textContent = `업데이트 다운로드 ${u.percent}%`;
+  else if (u.type === 'downloaded') t.textContent = '업데이트 준비됨 — 재시작 시 설치';
+  else if (u.type === 'latest') t.textContent = '최신 버전입니다';
+  else if (u.type === 'error') t.textContent = '업데이트 확인 실패';
 });
 
 // ---- 종목 검색 + 선택 ----
@@ -522,7 +527,14 @@ loadIndices();
 setInterval(loadIndices, 20000);
 setInterval(renderIndexBar, 30000); // 경과 시간 갱신
 window.api.getTheme().then(applyTheme);
-window.api.getVersion().then(
-  (v) => ($('#appVersion').textContent = `by Claudio Lim · v${v}`)
-);
+window.api.getVersion().then((v) => {
+  const el = $('#appVersion');
+  el.textContent = `by Claudio Lim · v${v}`;
+  el.style.cursor = 'pointer';
+  el.title = '클릭하면 업데이트 확인';
+  el.addEventListener('click', () => {
+    $('#wsText').textContent = '업데이트 확인 중...';
+    window.api.checkUpdate();
+  });
+});
 loadWatchlist();

@@ -310,6 +310,10 @@ function registerIpc() {
   });
 
   ipcMain.handle('app:version', () => app.getVersion());
+  ipcMain.handle('update:check', () => {
+    checkForUpdates();
+    return { ok: true };
+  });
 }
 
 /** 외부 링크를 Chrome으로 연다 (없으면 기본 브라우저). */
@@ -340,30 +344,45 @@ function openInChrome(url) {
 
 // ---------------- 자동 업데이트 ----------------
 
+function checkForUpdates() {
+  // 패키징(설치)된 앱에서만 동작 (개발/포터블 실행 시 비활성)
+  if (isDev || !app.isPackaged) return;
+  autoUpdater.checkForUpdates().catch((e) => console.error('업데이트 확인 실패:', e));
+}
+
 function setupAutoUpdater() {
-  if (isDev) return;
-  autoUpdater.autoDownload = true;
-  autoUpdater.on('update-available', (info) => {
-    if (mainWindow) mainWindow.webContents.send('update', { type: 'available', info });
-  });
-  autoUpdater.on('download-progress', (p) => {
-    if (mainWindow) mainWindow.webContents.send('update', { type: 'progress', percent: p.percent });
-  });
+  if (isDev || !app.isPackaged) return;
+  autoUpdater.autoDownload = true; // 새 버전 발견 시 자동 다운로드
+  autoUpdater.autoInstallOnAppQuit = true; // '나중에' 선택해도 종료 시 자동 설치
+
+  const send = (payload) => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update', payload);
+  };
+
+  autoUpdater.on('checking-for-update', () => send({ type: 'checking' }));
+  autoUpdater.on('update-available', (info) => send({ type: 'available', info }));
+  autoUpdater.on('update-not-available', () => send({ type: 'latest' }));
+  autoUpdater.on('download-progress', (p) => send({ type: 'progress', percent: Math.round(p.percent) }));
   autoUpdater.on('update-downloaded', async (info) => {
-    if (mainWindow) mainWindow.webContents.send('update', { type: 'downloaded', info });
+    send({ type: 'downloaded', info });
     const { response } = await dialog.showMessageBox({
       type: 'info',
       buttons: ['지금 재시작', '나중에'],
       defaultId: 0,
+      cancelId: 1,
       title: '업데이트 준비 완료',
-      message: `새 버전(${info.version})이 다운로드되었습니다. 지금 설치하시겠어요?`,
+      message: `새 버전(${info.version})이 준비되었습니다.`,
+      detail: "'지금 재시작'을 누르면 바로 설치됩니다. '나중에'를 누르면 프로그램 종료 시 자동 설치됩니다.",
     });
-    if (response === 0) autoUpdater.quitAndInstall();
+    if (response === 0) setImmediate(() => autoUpdater.quitAndInstall());
   });
   autoUpdater.on('error', (err) => {
     console.error('자동 업데이트 오류:', err);
+    send({ type: 'error', message: String((err && err.message) || err) });
   });
-  autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+
+  checkForUpdates(); // 실행 직후 최종 버전 확인
+  setInterval(checkForUpdates, 4 * 60 * 60 * 1000); // 4시간마다 재확인
 }
 
 // ---------------- 앱 라이프사이클 ----------------
