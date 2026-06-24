@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const cp = require('child_process');
@@ -24,8 +24,17 @@ const subInfo = new Map();
 let pollTimer = null;
 const POLL_INTERVAL = 4000; // ms
 
+/** 저장된 창 위치가 현재 연결된 모니터 안에 보이는지 */
+function boundsOnScreen(b) {
+  if (!b || b.x == null || b.y == null) return false;
+  return screen.getAllDisplays().some((d) => {
+    const a = d.workArea;
+    return b.x < a.x + a.width && b.x + b.width > a.x && b.y < a.y + a.height && b.y + b.height > a.y;
+  });
+}
+
 function createMainWindow() {
-  mainWindow = new BrowserWindow({
+  const opts = {
     width: 420,
     height: 640,
     minWidth: 360,
@@ -36,9 +45,27 @@ function createMainWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
-  });
+  };
+  // 마지막 창 위치/크기 복원
+  const saved = store.getWindowBounds();
+  if (saved && saved.width && saved.height) {
+    opts.width = saved.width;
+    opts.height = saved.height;
+    if (boundsOnScreen(saved)) {
+      opts.x = saved.x;
+      opts.y = saved.y;
+    }
+  }
+  mainWindow = new BrowserWindow(opts);
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' });
+
+  // 종료 시 위치/크기 저장
+  mainWindow.on('close', () => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isMinimized()) {
+      store.setWindowBounds(mainWindow.getBounds());
+    }
+  });
   mainWindow.on('closed', () => {
     mainWindow = null;
   });

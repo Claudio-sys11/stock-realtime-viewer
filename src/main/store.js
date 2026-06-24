@@ -22,6 +22,15 @@ class Store {
     }
   }
 
+  getWindowBounds() {
+    return this.data.windowBounds || null;
+  }
+
+  setWindowBounds(bounds) {
+    this.data.windowBounds = bounds;
+    this._save();
+  }
+
   getTheme() {
     return this.data.theme || 'light';
   }

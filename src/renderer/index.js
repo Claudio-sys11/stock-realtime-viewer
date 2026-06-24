@@ -402,31 +402,32 @@ function fmtDur(mins) {
 }
 
 // 한 세션(KRX/NXT/미국장)의 장 운영시간 HTML
+// 시작 전 = 빨강, 장 중 = 회색, 마감 30분 전 = 빨강 네온, 마감 후 = 블랙 음영
 function sessionHtml(tz, s) {
   const nowM = nowMinInTZ(tz);
   const openM = parseHM(s.open);
   const closeM = parseHM(s.close);
   const beforeOpen = nowM < openM;
-  const isOpen = nowM >= openM && nowM < closeM; // 현재 거래 중 여부
+  const afterClose = nowM >= closeM;
   const lbl = s.label ? `<b>${s.label}</b> ` : '';
-  // 시작 전=빨강(up), 시작 후=파랑(down)
-  const openCls = beforeOpen ? 'up' : 'down';
+  // 시작 라인: 시작 전=빨강, 장 중/마감 후=회색
+  const openCls = beforeOpen ? 'mkt-red' : 'mkt-gray';
   const openTxt = beforeOpen
     ? `시작 전 ${fmtDur(openM - nowM)}`
     : `시작 후 ${fmtDur(nowM - openM)}`;
-  let html = `<span class="im-line">${lbl}<span class="im-t">장시작 ${s.open}</span> <span class="${openCls}">${openTxt}</span></span>`;
+  let html = `<span class="im-line ${openCls}">${lbl}장시작 ${s.open} · ${openTxt}</span>`;
   // 시작 전이면 마감 정보 숨김
   if (!beforeOpen) {
     const minsToClose = closeM - nowM;
+    const closingSoon = minsToClose > 0 && minsToClose <= 30; // 마감 30분 전 = 빨강 네온
     const closeTxt = minsToClose > 0
       ? `마감 전 ${fmtDur(minsToClose)}`
       : `마감 후 ${fmtDur(-minsToClose)}`;
-    // 마감 30분 전부터 마감 직전까지 빨간 네온 깜빡임
-    const closingSoon = minsToClose > 0 && minsToClose <= 30;
-    html += `<span class="im-line${closingSoon ? ' mkt-closing' : ''}">${lbl}<span class="im-t">마감 ${s.close}</span> <span class="im-close">${closeTxt}</span></span>`;
+    const closeCls = closingSoon ? 'mkt-closing' : 'mkt-gray';
+    html += `<span class="im-line ${closeCls}">${lbl}마감 ${s.close} · ${closeTxt}</span>`;
   }
-  // 장 마감(미운영) 상태면 그레이 음영
-  return `<span class="mkt-session${isOpen ? '' : ' mkt-closed'}">${html}</span>`;
+  // 마감(후) 상태면 배경 블랙 음영
+  return `<span class="mkt-session${afterClose ? ' mkt-closed' : ''}">${html}</span>`;
 }
 
 // 지수 셀 아래에 들어갈 장 운영시간 HTML

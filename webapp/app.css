@@ -38,13 +38,14 @@ body {
 /* 장 운영시간 */
 .idx-mkt { display: flex; flex-wrap: wrap; gap: 3px 12px; margin-top: 4px; }
 .mkt-session { display: flex; flex-direction: column; gap: 1px; border-radius: 4px; padding: 2px 5px; }
-.mkt-closed { background: rgba(128, 128, 128, 0.18); opacity: 0.6; }
+.mkt-closed { background: rgba(0, 0, 0, 0.5); }
+.mkt-closed .im-line { color: #cdd2d9; }
 .im-line { font-size: 10px; line-height: 1.35; white-space: nowrap; }
-.im-line b { color: var(--text); font-weight: 700; }
-.im-t { color: var(--muted); }
-.im-close { color: var(--muted); }
+.im-line b { font-weight: 700; }
+.mkt-red { color: #ff2d2d; font-weight: 700; }
+.mkt-gray { color: var(--muted); }
 /* 마감 30분 전: 빨간 네온 깜빡임 */
-.mkt-closing, .mkt-closing .im-t, .mkt-closing .im-close, .mkt-closing b { color: #ff2d2d !important; font-weight: 700; }
+.mkt-closing { color: #ff2d2d !important; font-weight: 700; }
 .mkt-closing { animation: neonBlink 1s ease-in-out infinite; }
 @keyframes neonBlink {
   0%, 100% { opacity: 1; text-shadow: 0 0 3px #ff2d2d, 0 0 7px #ff2d2d, 0 0 12px rgba(255, 45, 45, .8); }
