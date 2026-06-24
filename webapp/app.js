@@ -100,26 +100,28 @@ function fmtDur(mins) {
 }
 function sessionHtml(tz, s) {
   const nowM = nowMinInTZ(tz), openM = parseHM(s.open), closeM = parseHM(s.close);
-  const beforeOpen = nowM < openM, afterClose = nowM >= closeM;
+  // 마감 후에는 표시 안 함 (하루 24시간 기준)
+  if (nowM >= closeM) return '';
+  const beforeOpen = nowM < openM;
   const lbl = s.label ? `<b>${s.label}</b> ` : '';
-  // 시작 전=빨강, 장 중/마감 후=회색
+  // 시작 전=빨강, 장 중=회색
   const openCls = beforeOpen ? 'mkt-red' : 'mkt-gray';
   const openTxt = beforeOpen ? `시작 전 ${fmtDur(openM - nowM)}` : `시작 후 ${fmtDur(nowM - openM)}`;
   let html = `<span class="im-line ${openCls}">${lbl}장시작 ${s.open} · ${openTxt}</span>`;
   if (!beforeOpen) {
     const m2c = closeM - nowM;
-    const closingSoon = m2c > 0 && m2c <= 30; // 마감 30분 전 = 빨강 네온
-    const closeTxt = m2c > 0 ? `마감 전 ${fmtDur(m2c)}` : `마감 후 ${fmtDur(-m2c)}`;
+    const closingSoon = m2c <= 30; // 마감 30분 전 = 빨강 네온
     const closeCls = closingSoon ? 'mkt-closing' : 'mkt-gray';
-    html += `<span class="im-line ${closeCls}">${lbl}마감 ${s.close} · ${closeTxt}</span>`;
+    html += `<span class="im-line ${closeCls}">${lbl}마감 ${s.close} · 마감 전 ${fmtDur(m2c)}</span>`;
   }
-  // 마감(후) = 블랙 음영
-  return `<span class="mkt-session${afterClose ? ' mkt-closed' : ''}">${html}</span>`;
+  return `<span class="mkt-session">${html}</span>`;
 }
 function marketHoursHtml(key) {
   const mh = MARKET_HOURS[key];
   if (!mh) return '';
-  return `<div class="idx-mkt">${mh.sessions.map((s) => sessionHtml(mh.tz, s)).join('')}</div>`;
+  const inner = mh.sessions.map((s) => sessionHtml(mh.tz, s)).join('');
+  if (!inner) return ''; // 모든 세션 마감 후면 표시 안 함
+  return `<div class="idx-mkt">${inner}</div>`;
 }
 
 // ---------------- 지수 바 (상하 배치) ----------------

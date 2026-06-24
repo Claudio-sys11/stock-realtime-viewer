@@ -401,33 +401,30 @@ function fmtDur(mins) {
   return `${m}분`;
 }
 
-// 한 세션(KRX/NXT/미국장)의 장 운영시간 HTML
-// 시작 전 = 빨강, 장 중 = 회색, 마감 30분 전 = 빨강 네온, 마감 후 = 블랙 음영
+// 한 세션(KRX/NXT/미국장)의 장 운영시간 HTML (하루 24시간 기준)
+// 시작 전 = 빨강, 장 중 = 회색, 마감 30분 전 = 빨강 네온, 마감 후 = 표시 안 함
 function sessionHtml(tz, s) {
   const nowM = nowMinInTZ(tz);
   const openM = parseHM(s.open);
   const closeM = parseHM(s.close);
+  // 마감 후에는 더 이상 표시하지 않음
+  if (nowM >= closeM) return '';
   const beforeOpen = nowM < openM;
-  const afterClose = nowM >= closeM;
   const lbl = s.label ? `<b>${s.label}</b> ` : '';
-  // 시작 라인: 시작 전=빨강, 장 중/마감 후=회색
+  // 시작 라인: 시작 전=빨강, 장 중=회색
   const openCls = beforeOpen ? 'mkt-red' : 'mkt-gray';
   const openTxt = beforeOpen
     ? `시작 전 ${fmtDur(openM - nowM)}`
     : `시작 후 ${fmtDur(nowM - openM)}`;
   let html = `<span class="im-line ${openCls}">${lbl}장시작 ${s.open} · ${openTxt}</span>`;
-  // 시작 전이면 마감 정보 숨김
+  // 시작 전이면 마감 정보 숨김 / 장 중이면 마감 전 표시
   if (!beforeOpen) {
     const minsToClose = closeM - nowM;
-    const closingSoon = minsToClose > 0 && minsToClose <= 30; // 마감 30분 전 = 빨강 네온
-    const closeTxt = minsToClose > 0
-      ? `마감 전 ${fmtDur(minsToClose)}`
-      : `마감 후 ${fmtDur(-minsToClose)}`;
+    const closingSoon = minsToClose <= 30; // 마감 30분 전 = 빨강 네온
     const closeCls = closingSoon ? 'mkt-closing' : 'mkt-gray';
-    html += `<span class="im-line ${closeCls}">${lbl}마감 ${s.close} · ${closeTxt}</span>`;
+    html += `<span class="im-line ${closeCls}">${lbl}마감 ${s.close} · 마감 전 ${fmtDur(minsToClose)}</span>`;
   }
-  // 마감(후) 상태면 배경 블랙 음영
-  return `<span class="mkt-session${afterClose ? ' mkt-closed' : ''}">${html}</span>`;
+  return `<span class="mkt-session">${html}</span>`;
 }
 
 // 지수 셀 아래에 들어갈 장 운영시간 HTML
@@ -435,6 +432,7 @@ function marketHoursHtml(key) {
   const mh = MARKET_HOURS[key];
   if (!mh) return '';
   const inner = mh.sessions.map((s) => sessionHtml(mh.tz, s)).join('');
+  if (!inner) return ''; // 모든 세션 마감 후면 표시 안 함
   return `<span class="idx-mkt">${inner}</span>`;
 }
 
