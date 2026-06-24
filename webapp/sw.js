@@ -1,5 +1,5 @@
 // 서비스 워커 — 앱 셸 오프라인 캐시 (데이터는 항상 네트워크)
-const CACHE = 'stockviewer-v9';
+const CACHE = 'stockviewer-v10';
 const SHELL = [
   './',
   './index.html',

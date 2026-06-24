@@ -407,29 +407,40 @@ function fmtDur(mins) {
 }
 
 // 한 세션(KRX/NXT/미국장)의 장 운영시간 HTML (하루 24시간 기준)
-// 시작 전 = 빨강, 장 중 = 회색, 마감 30분 전 = 빨강 네온, 마감 후 = 표시 안 함
+// 장시작/마감 시각은 항상 표시. 시작·마감 전/후는 해당 상태가 아니면 하이픈.
+// 시작 전·마감 30분 전 = 빨강, 그 외 = 회색
 function sessionHtml(tz, s) {
   const nowM = nowMinInTZ(tz);
   const openM = parseHM(s.open);
   const closeM = parseHM(s.close);
-  // 마감 후에는 더 이상 표시하지 않음
-  if (nowM >= closeM) return '';
   const beforeOpen = nowM < openM;
+  const afterClose = nowM >= closeM;
   const lbl = s.label ? `<b>${s.label}</b> ` : '';
-  // 시작 라인: 시작 전=빨강, 장 중=회색
-  const openCls = beforeOpen ? 'mkt-red' : 'mkt-gray';
-  const openTxt = beforeOpen
-    ? `시작 전 ${fmtDur(openM - nowM)}`
-    : `시작 후 ${fmtDur(nowM - openM)}`;
-  let html = `<span class="im-line ${openCls}">${lbl}장시작 ${s.open} · ${openTxt}</span>`;
-  // 시작 전이면 마감 정보 숨김 / 장 중이면 마감 전 표시
-  if (!beforeOpen) {
-    const minsToClose = closeM - nowM;
-    const closingSoon = minsToClose <= 30; // 마감 30분 전 = 빨강 네온
-    const closeCls = closingSoon ? 'mkt-closing' : 'mkt-gray';
-    html += `<span class="im-line ${closeCls}">${lbl}마감 ${s.close} · 마감 전 ${fmtDur(minsToClose)}</span>`;
+
+  // 장시작 표시: 개장 전=시작 전(빨강), 장 중=시작 후(회색), 마감 후=하이픈
+  let openRel = '-';
+  let openCls = 'mkt-gray';
+  if (beforeOpen) {
+    openRel = `시작 전 ${fmtDur(openM - nowM)}`;
+    openCls = 'mkt-red';
+  } else if (!afterClose) {
+    openRel = `시작 후 ${fmtDur(nowM - openM)}`;
   }
-  return `<span class="mkt-session">${html}</span>`;
+
+  // 마감 표시: 개장 전=하이픈, 장 중=마감 전(30분 전 빨강 네온), 마감 후=마감 후
+  let closeRel = '-';
+  let closeCls = 'mkt-gray';
+  if (afterClose) {
+    closeRel = `마감 후 ${fmtDur(nowM - closeM)}`;
+  } else if (!beforeOpen) {
+    const minsToClose = closeM - nowM;
+    closeRel = `마감 전 ${fmtDur(minsToClose)}`;
+    if (minsToClose <= 30) closeCls = 'mkt-closing';
+  }
+
+  const l1 = `<span class="im-line">${lbl}<span class="im-t">장시작 ${s.open}</span> · <span class="${openCls}">${openRel}</span></span>`;
+  const l2 = `<span class="im-line">${lbl}<span class="im-t">마감 ${s.close}</span> · <span class="${closeCls}">${closeRel}</span></span>`;
+  return `<span class="mkt-session">${l1}${l2}</span>`;
 }
 
 // 지수 셀 아래에 들어갈 장 운영시간 HTML

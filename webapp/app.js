@@ -98,30 +98,33 @@ function fmtDur(mins) {
   const h = Math.floor(mins / 60), m = mins % 60;
   return h && m ? `${h}시간 ${m}분` : h ? `${h}시간` : `${m}분`;
 }
+// 장시작/마감 시각은 항상 표시. 시작·마감 전/후는 비활성 시 하이픈.
+// 시작 전·마감 30분 전 = 빨강, 그 외 = 회색
 function sessionHtml(tz, s) {
   const nowM = nowMinInTZ(tz), openM = parseHM(s.open), closeM = parseHM(s.close);
-  // 마감 후에는 표시 안 함 (하루 24시간 기준)
-  if (nowM >= closeM) return '';
-  const beforeOpen = nowM < openM;
+  const beforeOpen = nowM < openM, afterClose = nowM >= closeM;
   const lbl = s.label ? `<b>${s.label}</b> ` : '';
-  // 시작 전=빨강, 장 중=회색
-  const openCls = beforeOpen ? 'mkt-red' : 'mkt-gray';
-  const openTxt = beforeOpen ? `시작 전 ${fmtDur(openM - nowM)}` : `시작 후 ${fmtDur(nowM - openM)}`;
-  let html = `<span class="im-line ${openCls}">${lbl}장시작 ${s.open} · ${openTxt}</span>`;
-  if (!beforeOpen) {
+
+  let openRel = '-', openCls = 'mkt-gray';
+  if (beforeOpen) { openRel = `시작 전 ${fmtDur(openM - nowM)}`; openCls = 'mkt-red'; }
+  else if (!afterClose) { openRel = `시작 후 ${fmtDur(nowM - openM)}`; }
+
+  let closeRel = '-', closeCls = 'mkt-gray';
+  if (afterClose) { closeRel = `마감 후 ${fmtDur(nowM - closeM)}`; }
+  else if (!beforeOpen) {
     const m2c = closeM - nowM;
-    const closingSoon = m2c <= 30; // 마감 30분 전 = 빨강 네온
-    const closeCls = closingSoon ? 'mkt-closing' : 'mkt-gray';
-    html += `<span class="im-line ${closeCls}">${lbl}마감 ${s.close} · 마감 전 ${fmtDur(m2c)}</span>`;
+    closeRel = `마감 전 ${fmtDur(m2c)}`;
+    if (m2c <= 30) closeCls = 'mkt-closing';
   }
-  return `<span class="mkt-session">${html}</span>`;
+
+  const l1 = `<span class="im-line">${lbl}<span class="im-t">장시작 ${s.open}</span> · <span class="${openCls}">${openRel}</span></span>`;
+  const l2 = `<span class="im-line">${lbl}<span class="im-t">마감 ${s.close}</span> · <span class="${closeCls}">${closeRel}</span></span>`;
+  return `<span class="mkt-session">${l1}${l2}</span>`;
 }
 function marketHoursHtml(key) {
   const mh = MARKET_HOURS[key];
   if (!mh) return '';
-  const inner = mh.sessions.map((s) => sessionHtml(mh.tz, s)).join('');
-  if (!inner) return ''; // 모든 세션 마감 후면 표시 안 함
-  return `<div class="idx-mkt">${inner}</div>`;
+  return `<div class="idx-mkt">${mh.sessions.map((s) => sessionHtml(mh.tz, s)).join('')}</div>`;
 }
 
 // ---------------- 지수 바 (상하 배치) ----------------

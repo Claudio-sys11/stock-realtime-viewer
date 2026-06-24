@@ -40,8 +40,9 @@ body {
 .mkt-session { display: flex; flex-direction: column; gap: 1px; border-radius: 4px; padding: 2px 5px; }
 .mkt-closed { background: rgba(0, 0, 0, 0.5); }
 .mkt-closed .im-line { color: #cdd2d9; }
-.im-line { font-size: 10px; line-height: 1.35; white-space: nowrap; }
+.im-line { font-size: 10px; line-height: 1.35; white-space: nowrap; color: var(--muted); }
 .im-line b { font-weight: 700; }
+.im-t { color: var(--muted); }
 .mkt-red { color: #ff2d2d; font-weight: 700; }
 .mkt-gray { color: var(--muted); }
 /* 마감 30분 전: 빨간 네온 깜빡임 */
