@@ -417,25 +417,23 @@ function sessionHtml(tz, s) {
   const afterClose = nowM >= closeM;
   const lbl = s.label ? `<b>${s.label}</b> ` : '';
 
-  // 장시작 표시: 개장 전=시작 전(빨강), 장 중=시작 후(회색), 마감 후=하이픈
+  // 장시작: 개장 30분 전=빨강, 그 외 개장 전/장 중=회색, 마감 후=하이픈
   let openRel = '-';
   let openCls = 'mkt-gray';
   if (beforeOpen) {
     openRel = `시작 전 ${fmtDur(openM - nowM)}`;
-    openCls = 'mkt-red';
+    if (openM - nowM <= 30) openCls = 'mkt-closing'; // 시작 30분 전 = 빨강
   } else if (!afterClose) {
-    openRel = `시작 후 ${fmtDur(nowM - openM)}`;
+    openRel = `시작 후 ${fmtDur(nowM - openM)}`; // 장 중 = 회색
   }
 
-  // 마감 표시: 개장 전=하이픈, 장 중=마감 전(30분 전 빨강 네온), 마감 후=마감 후
+  // 마감: 마감 30분 전=빨강, 장 중=회색, 개장 전/마감 후=하이픈
   let closeRel = '-';
   let closeCls = 'mkt-gray';
-  if (afterClose) {
-    closeRel = `마감 후 ${fmtDur(nowM - closeM)}`;
-  } else if (!beforeOpen) {
+  if (!beforeOpen && !afterClose) {
     const minsToClose = closeM - nowM;
     closeRel = `마감 전 ${fmtDur(minsToClose)}`;
-    if (minsToClose <= 30) closeCls = 'mkt-closing';
+    if (minsToClose <= 30) closeCls = 'mkt-closing'; // 마감 30분 전 = 빨강
   }
 
   const l1 = `<span class="im-line">${lbl}<span class="im-t">장시작 ${s.open}</span> · <span class="${openCls}">${openRel}</span></span>`;
@@ -539,13 +537,10 @@ setInterval(loadIndices, 20000);
 setInterval(renderIndexBar, 30000); // 경과 시간 갱신
 window.api.getTheme().then(applyTheme);
 window.api.getVersion().then((v) => {
-  const el = $('#appVersion');
-  el.textContent = `by Claudio Lim · v${v}`;
-  el.style.cursor = 'pointer';
-  el.title = '클릭하면 업데이트 확인';
-  el.addEventListener('click', () => {
-    $('#wsText').textContent = '업데이트 확인 중...';
-    window.api.checkUpdate();
-  });
+  $('#appVersion').textContent = `by Claudio Lim · v${v}`;
+});
+$('#checkUpdateBtn').addEventListener('click', () => {
+  $('#wsText').textContent = '업데이트 확인 중...';
+  window.api.checkUpdate();
 });
 loadWatchlist();

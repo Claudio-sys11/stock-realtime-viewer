@@ -27,9 +27,14 @@
   <ul class="watchlist" id="watchlist"></ul>
 
   <div class="status">
-    <span id="wsDot" class="dot"></span>
-    <span id="wsText">대기 중</span>
-    <span style="float:right" id="appVersion"></span>
+    <div class="status-row">
+      <span id="wsDot" class="dot"></span>
+      <span id="wsText">대기 중</span>
+      <span style="float:right" id="appVersion"></span>
+    </div>
+    <div class="status-row update-row">
+      <button id="checkUpdateBtn" class="upd-btn">⟳ 업데이트 확인</button>
+    </div>
   </div>
 
   <script src="index.js"></script>

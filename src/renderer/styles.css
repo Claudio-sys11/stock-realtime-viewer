@@ -183,6 +183,14 @@ input {
 }
 
 .status { font-size: 11px; padding: 6px 12px; color: var(--muted); border-top: 1px solid var(--border); }
+.status-row { overflow: hidden; }
+.update-row { text-align: right; margin-top: 5px; }
+.upd-btn {
+  background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 9px; font-size: 11px; cursor: pointer;
+}
+.upd-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.upd-btn:disabled { opacity: 0.5; cursor: default; }
 .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#999; margin-right:6px; }
 .dot.connected { background:#2ea043; }
 .dot.connecting { background:#d29922; }

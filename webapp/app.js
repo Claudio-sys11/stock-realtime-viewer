@@ -105,13 +105,14 @@ function sessionHtml(tz, s) {
   const beforeOpen = nowM < openM, afterClose = nowM >= closeM;
   const lbl = s.label ? `<b>${s.label}</b> ` : '';
 
+  // 장시작: 개장 30분 전=빨강, 그 외 개장 전/장 중=회색, 마감 후=하이픈
   let openRel = '-', openCls = 'mkt-gray';
-  if (beforeOpen) { openRel = `시작 전 ${fmtDur(openM - nowM)}`; openCls = 'mkt-red'; }
+  if (beforeOpen) { openRel = `시작 전 ${fmtDur(openM - nowM)}`; if (openM - nowM <= 30) openCls = 'mkt-closing'; }
   else if (!afterClose) { openRel = `시작 후 ${fmtDur(nowM - openM)}`; }
 
+  // 마감: 마감 30분 전=빨강, 장 중=회색, 개장 전/마감 후=하이픈
   let closeRel = '-', closeCls = 'mkt-gray';
-  if (afterClose) { closeRel = `마감 후 ${fmtDur(nowM - closeM)}`; }
-  else if (!beforeOpen) {
+  if (!beforeOpen && !afterClose) {
     const m2c = closeM - nowM;
     closeRel = `마감 전 ${fmtDur(m2c)}`;
     if (m2c <= 30) closeCls = 'mkt-closing';
