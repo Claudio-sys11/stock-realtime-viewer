@@ -279,7 +279,7 @@ window.api.onUpdate((u) => {
   if (u.type === 'checking') t.textContent = '업데이트 확인 중...';
   else if (u.type === 'available') t.textContent = `새 버전 발견 — 다운로드 중...`;
   else if (u.type === 'progress') t.textContent = `업데이트 다운로드 ${u.percent}%`;
-  else if (u.type === 'downloaded') t.textContent = '업데이트 준비됨 — 재시작 시 설치';
+  else if (u.type === 'downloaded') t.textContent = '최신 버전 설치 중 — 곧 자동 재시작됩니다';
   else if (u.type === 'latest') t.textContent = '최신 버전입니다';
   else if (u.type === 'error') t.textContent = '업데이트 확인 실패';
 });

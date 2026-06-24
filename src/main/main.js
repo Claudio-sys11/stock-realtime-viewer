@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, shell, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const cp = require('child_process');
@@ -363,18 +363,17 @@ function setupAutoUpdater() {
   autoUpdater.on('update-available', (info) => send({ type: 'available', info }));
   autoUpdater.on('update-not-available', () => send({ type: 'latest' }));
   autoUpdater.on('download-progress', (p) => send({ type: 'progress', percent: Math.round(p.percent) }));
-  autoUpdater.on('update-downloaded', async (info) => {
+  autoUpdater.on('update-downloaded', (info) => {
     send({ type: 'downloaded', info });
-    const { response } = await dialog.showMessageBox({
-      type: 'info',
-      buttons: ['지금 재시작', '나중에'],
-      defaultId: 0,
-      cancelId: 1,
-      title: '업데이트 준비 완료',
-      message: `새 버전(${info.version})이 준비되었습니다.`,
-      detail: "'지금 재시작'을 누르면 바로 설치됩니다. '나중에'를 누르면 프로그램 종료 시 자동 설치됩니다.",
-    });
-    if (response === 0) setImmediate(() => autoUpdater.quitAndInstall());
+    // 자동으로 설치 후 새 버전으로 재시작 (안내 표시 후 잠깐 뒤)
+    // quitAndInstall(isSilent=true, isForceRunAfter=true): 조용히 설치하고 앱 자동 재실행
+    setTimeout(() => {
+      try {
+        autoUpdater.quitAndInstall(true, true);
+      } catch (e) {
+        console.error('업데이트 설치 실패:', e);
+      }
+    }, 3000);
   });
   autoUpdater.on('error', (err) => {
     console.error('자동 업데이트 오류:', err);
