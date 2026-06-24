@@ -268,7 +268,15 @@ async function loadVersion() {
     const r = await fetch('https://api.github.com/repos/Claudio-sys11/stock-realtime-viewer/releases/latest', { headers: { Accept: 'application/vnd.github+json' } });
     if (!r.ok) return;
     const j = await r.json();
-    if (j.tag_name) $('#ver').textContent = `${j.tag_name} ↓`;
+    if (j.tag_name) $('#ver').textContent = j.tag_name;
+    // 프로그램(Windows 설치파일) 다이렉트 다운로드 링크
+    const assets = j.assets || [];
+    const exe = assets.find((a) => /setup.*\.exe$/i.test(a.name)) || assets.find((a) => /\.exe$/i.test(a.name));
+    if (exe && exe.browser_download_url) {
+      const dl = $('#dl');
+      dl.href = exe.browser_download_url;
+      dl.textContent = `⬇ ${j.tag_name} 설치파일`;
+    }
   } catch (_) {}
 }
 
