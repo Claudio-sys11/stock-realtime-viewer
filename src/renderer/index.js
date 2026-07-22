@@ -113,16 +113,17 @@ async function loadSparkline(symbol) {
 function asItem(o) {
   return {
     symbol: o.symbol,
-    market: o.market === 'US' ? 'US' : 'KR',
+    market: o.market === 'US' || o.market === 'JP' ? o.market : 'KR',
     apiCode: o.apiCode || o.symbol,
   };
 }
 
 // ---- 관심종목 ----
 function renderItem(item) {
-  const market = item.market === 'US' ? 'US' : 'KR';
+  const market = item.market === 'US' || item.market === 'JP' ? item.market : 'KR';
   const apiCode = item.apiCode || item.symbol;
-  const codeLabel = market === 'US' ? `${item.symbol} · 미국` : item.symbol;
+  const nation = market === 'US' ? '미국' : market === 'JP' ? '일본' : '';
+  const codeLabel = nation ? `${item.symbol} · ${nation}` : item.symbol;
   const li = document.createElement('li');
   li.className = 'watch-item';
   li.dataset.symbol = item.symbol;
@@ -177,23 +178,27 @@ function renderItem(item) {
   });
 }
 
-// ---- 환율 (미국 종목 원화 환산) ----
-let fxRate = null;
+// ---- 환율 (해외 종목 원화 환산) ----
+let fxUsd = null;
+let fxJpy = null;
+function krwRate(market) {
+  return market === 'US' ? fxUsd : market === 'JP' ? fxJpy : null;
+}
 function setKrw(it, price) {
   const el = it.el.querySelector('.krw');
   if (!el) return;
-  if (it.market === 'US' && fxRate && price != null) {
-    el.textContent = `≈ ${Math.round(price * fxRate).toLocaleString('ko-KR')}원`;
+  const rate = krwRate(it.market);
+  if (rate && price != null) {
+    el.textContent = `≈ ${Math.round(price * rate).toLocaleString('ko-KR')}원`;
   } else {
     el.textContent = '';
   }
 }
 async function loadFx() {
-  const r = await window.api.getUsdKrw();
-  if (r.ok) {
-    fxRate = r.rate;
-    for (const it of items.values()) if (it.market === 'US') setKrw(it, it.lastPrice);
-  }
+  const [u, j] = await Promise.all([window.api.getUsdKrw(), window.api.getJpyKrw()]);
+  if (u.ok) fxUsd = u.rate;
+  if (j.ok) fxJpy = j.rate;
+  for (const it of items.values()) if (it.market !== 'KR') setKrw(it, it.lastPrice);
 }
 
 function flash(el, dir) {

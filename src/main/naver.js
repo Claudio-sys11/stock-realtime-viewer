@@ -27,9 +27,10 @@ const WORLD_SCT = { D: 'candleDay', W: 'candleWeek', M: 'candleMonth' };
 // 종목 식별자 정규화: 문자열(구버전 한국코드) 또는 {symbol,market,apiCode}
 function normalizeItem(item) {
   if (typeof item === 'string') return { symbol: item, market: 'KR', apiCode: item };
+  const m = item.market;
   return {
     symbol: item.symbol || item.code,
-    market: item.market === 'US' ? 'US' : 'KR',
+    market: m === 'US' || m === 'JP' ? m : 'KR',
     apiCode: item.apiCode || item.symbol || item.code,
   };
 }
@@ -48,10 +49,10 @@ function yyyymmdd(d) {
 }
 
 class NaverClient {
-  /** 일/주/월봉 차트 (한국/미국) */
+  /** 일/주/월봉 차트 (한국/해외) */
   async getDailyChart(item, period = 'D') {
     const { market, apiCode } = normalizeItem(item);
-    if (market === 'US') return this._worldStockChart(apiCode, period);
+    if (market !== 'KR') return this._worldStockChart(apiCode, period);
 
     const tf = TIMEFRAME[period] || 'day';
     const now = new Date();
@@ -134,11 +135,11 @@ class NaverClient {
     };
   }
 
-  /** 단일 종목 현재가 (한국/미국) */
+  /** 단일 종목 현재가 (한국/해외) */
   async getQuote(item) {
     const { symbol, market, apiCode } = normalizeItem(item);
     const url =
-      market === 'US'
+      market !== 'KR'
         ? 'https://polling.finance.naver.com/api/realtime/worldstock/stock/' + encodeURIComponent(apiCode)
         : 'https://polling.finance.naver.com/api/realtime/domestic/stock/' + apiCode;
     const res = await fetch(url, { headers: HEADERS });
@@ -150,11 +151,11 @@ class NaverClient {
     return { symbol, name: q.name, price: q.price, change: q.change, changeRate: q.changeRate };
   }
 
-  /** 다중 종목 현재가 (실시간 폴링용) — 한국은 일괄, 미국은 개별 */
+  /** 다중 종목 현재가 (실시간 폴링용) — 한국은 일괄, 해외(미국/일본)는 개별 */
   async pollMany(items) {
     const list = items.map(normalizeItem);
-    const kr = list.filter((i) => i.market !== 'US');
-    const us = list.filter((i) => i.market === 'US');
+    const kr = list.filter((i) => i.market === 'KR');
+    const us = list.filter((i) => i.market !== 'KR');
     const out = [];
 
     if (kr.length) {
@@ -287,19 +288,35 @@ class NaverClient {
     const res = await fetch(url, { headers: HEADERS });
     if (!res.ok) throw new Error(`검색 실패 (${res.status})`);
     const data = await res.json();
+    const MK = { KOR: 'KR', USA: 'US', JPN: 'JP' };
     return (data.items || [])
       .filter(
         (it) =>
-          (it.nationCode === 'KOR' && /^\d{6}$/.test(it.code)) || it.nationCode === 'USA'
+          (it.nationCode === 'KOR' && /^\d{6}$/.test(it.code)) ||
+          it.nationCode === 'USA' ||
+          it.nationCode === 'JPN'
       )
       .slice(0, 20)
       .map((it) => ({
         code: it.code,
         name: it.name,
-        market: it.nationCode === 'USA' ? 'US' : 'KR',
-        apiCode: it.nationCode === 'USA' ? it.reutersCode : it.code,
+        market: MK[it.nationCode] || 'KR',
+        apiCode: it.nationCode === 'KOR' ? it.code : it.reutersCode,
         exchange: it.typeName || '',
       }));
+  }
+
+  /** 원/엔 환율 (100엔당 원 → 1엔당으로 환산해 반환) */
+  async getJpyKrw() {
+    const url =
+      'https://m.stock.naver.com/front-api/marketIndex/productDetail?category=exchange&reutersCode=FX_JPYKRW';
+    const res = await fetch(url, { headers: HEADERS });
+    if (!res.ok) throw new Error(`환율 조회 실패 (${res.status})`);
+    const data = await res.json();
+    const r = data.result || {};
+    const per100 = num(r.calcPrice != null ? r.calcPrice : r.closePrice);
+    if (!per100) throw new Error('환율 값을 찾을 수 없습니다.');
+    return per100 / 100; // 1엔당 원
   }
 }
 

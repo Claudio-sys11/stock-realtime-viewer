@@ -3,9 +3,11 @@
 const $ = (s) => document.querySelector(s);
 const fmtN = (n, dec) => Number(n).toLocaleString('ko-KR', dec ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : {});
 const colorClass = (c) => (c > 0 ? 'up' : c < 0 ? 'down' : 'flat');
-const isUS = (m) => m === 'US';
+const isUS = (m) => m === 'US'; // 소수점 표시는 미국만 (일본/한국은 정수)
+const nationOf = (m) => (m === 'US' ? '미국' : m === 'JP' ? '일본' : '');
 
-let fxRate = null;
+let fxUsd = null, fxJpy = null;
+function krwRate(m) { return m === 'US' ? fxUsd : m === 'JP' ? fxJpy : null; }
 let watch = loadWatch(); // [{symbol,name,market,apiCode}]
 const state = new Map(); // symbol → {lastPrice, closes, startPrice}
 
@@ -191,7 +193,7 @@ function endDrag() {
 function renderWatch() {
   const el = $('#watchlist');
   el.innerHTML = watch.map((it) => {
-    const codeLabel = isUS(it.market) ? `${it.symbol} · 미국` : it.symbol;
+    const codeLabel = nationOf(it.market) ? `${it.symbol} · ${nationOf(it.market)}` : it.symbol;
     return `<li class="w-item" data-symbol="${it.symbol}">
       <div class="w-info"><div class="w-name">${it.name}</div><div class="w-code">${codeLabel}</div></div>
       <svg class="w-spark"></svg>
@@ -232,7 +234,8 @@ function setRow(symbol, price, change, rate) {
   rateEl.className = `w-rate ${cls}`;
   rateEl.textContent = `${sign} ${fmtN(Math.abs(change), isUS(it.market))} (${rate}%)`;
   const krwEl = li.querySelector('.w-krw');
-  krwEl.textContent = isUS(it.market) && fxRate ? `≈ ${Math.round(price * fxRate).toLocaleString('ko-KR')}원` : '';
+  const krate = krwRate(it.market);
+  krwEl.textContent = krate ? `≈ ${Math.round(price * krate).toLocaleString('ko-KR')}원` : '';
   const st = state.get(symbol);
   if (st && st.closes && st.closes.length) {
     st.closes[st.closes.length - 1] = price;
@@ -265,7 +268,12 @@ async function pollWatch() {
 }
 
 async function loadFx() {
-  try { fxRate = await NV.getUsdKrw(); renderWatch(); } catch (_) {}
+  try {
+    const [u, j] = await Promise.all([NV.getUsdKrw().catch(() => null), NV.getJpyKrw().catch(() => null)]);
+    if (u != null) fxUsd = u;
+    if (j != null) fxJpy = j;
+    renderWatch();
+  } catch (_) {}
 }
 
 // 최신 릴리스 버전 표시 (Windows 업데이트 시 자동 동기화). GitHub API는 CORS 허용.
@@ -287,7 +295,7 @@ async function loadVersion() {
 }
 
 function addStock(item) {
-  const it = { symbol: item.code || item.symbol, name: item.name, market: item.market === 'US' ? 'US' : 'KR', apiCode: item.apiCode || item.code };
+  const it = { symbol: item.code || item.symbol, name: item.name, market: item.market === 'US' || item.market === 'JP' ? item.market : 'KR', apiCode: item.apiCode || item.code };
   if (!watch.find((x) => x.symbol === it.symbol)) { watch.push(it); saveWatch(); renderWatch(); }
   clearSearch();
 }
@@ -354,7 +362,8 @@ function cvSetPrice(price, change, rate, dec) {
   $('#cvPrice').className = cls;
   $('#cvRate').textContent = `${sign} ${fmtN(Math.abs(change), dec)} (${rate}%)`;
   $('#cvRate').className = `rate ${cls}`;
-  $('#cvKrw').textContent = current.type === 'stock' && isUS(current.market) && fxRate ? `≈ ${Math.round(price * fxRate).toLocaleString('ko-KR')}원` : '';
+  const cvRate = current.type === 'stock' ? krwRate(current.market) : null;
+  $('#cvKrw').textContent = cvRate ? `≈ ${Math.round(price * cvRate).toLocaleString('ko-KR')}원` : '';
   if (lastPoint) { lastPoint = { time: lastPoint.time, value: price }; series.update(lastPoint); }
 }
 

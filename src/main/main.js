@@ -96,7 +96,7 @@ function openStockWindow(symbol, name, type, market, apiCode) {
   url.searchParams.set('symbol', symbol);
   url.searchParams.set('name', name || symbol);
   url.searchParams.set('type', type === 'index' ? 'index' : 'stock');
-  url.searchParams.set('market', market === 'US' ? 'US' : 'KR');
+  url.searchParams.set('market', market === 'US' || market === 'JP' ? market : 'KR');
   url.searchParams.set('apiCode', apiCode || symbol);
   win.loadURL(url.toString());
   if (isDev) win.webContents.openDevTools({ mode: 'detach' });
@@ -197,7 +197,7 @@ function registerIpc() {
       item = {
         symbol: input.symbol || input.code,
         name: input.name,
-        market: input.market === 'US' ? 'US' : 'KR',
+        market: input.market === 'US' || input.market === 'JP' ? input.market : 'KR',
         apiCode: input.apiCode || input.symbol || input.code,
       };
     }
@@ -278,6 +278,14 @@ function registerIpc() {
   ipcMain.handle('fx:usdkrw', async () => {
     try {
       return { ok: true, rate: await naver.getUsdKrw() };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('fx:jpykrw', async () => {
+    try {
+      return { ok: true, rate: await naver.getJpyKrw() };
     } catch (e) {
       return { ok: false, error: e.message };
     }

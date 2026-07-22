@@ -31,9 +31,10 @@
   }
   function normalizeItem(item) {
     if (typeof item === 'string') return { symbol: item, market: 'KR', apiCode: item };
+    const m = item.market;
     return {
       symbol: item.symbol || item.code,
-      market: item.market === 'US' ? 'US' : 'KR',
+      market: m === 'US' || m === 'JP' ? m : 'KR',
       apiCode: item.apiCode || item.symbol || item.code,
     };
   }
@@ -62,21 +63,22 @@
     if (!query) return [];
     const url = `https://ac.stock.naver.com/ac?q=${encodeURIComponent(query)}&target=stock&st=111`;
     const data = await pJson(url);
+    const MK = { KOR: 'KR', USA: 'US', JPN: 'JP' };
     return (data.items || [])
-      .filter((it) => (it.nationCode === 'KOR' && /^\d{6}$/.test(it.code)) || it.nationCode === 'USA')
+      .filter((it) => (it.nationCode === 'KOR' && /^\d{6}$/.test(it.code)) || it.nationCode === 'USA' || it.nationCode === 'JPN')
       .slice(0, 20)
       .map((it) => ({
         code: it.code,
         name: it.name,
-        market: it.nationCode === 'USA' ? 'US' : 'KR',
-        apiCode: it.nationCode === 'USA' ? it.reutersCode : it.code,
+        market: MK[it.nationCode] || 'KR',
+        apiCode: it.nationCode === 'KOR' ? it.code : it.reutersCode,
         exchange: it.typeName || '',
       }));
   }
 
   async function getQuote(item) {
     const { symbol, market, apiCode } = normalizeItem(item);
-    const url = market === 'US'
+    const url = market !== 'KR'
       ? 'https://polling.finance.naver.com/api/realtime/worldstock/stock/' + encodeURIComponent(apiCode)
       : 'https://polling.finance.naver.com/api/realtime/domestic/stock/' + apiCode;
     const data = await pJson(url);
@@ -88,8 +90,8 @@
 
   async function pollMany(items) {
     const list = items.map(normalizeItem);
-    const kr = list.filter((i) => i.market !== 'US');
-    const us = list.filter((i) => i.market === 'US');
+    const kr = list.filter((i) => i.market === 'KR');
+    const us = list.filter((i) => i.market !== 'KR');
     const out = [];
     if (kr.length) {
       try {
@@ -115,7 +117,7 @@
 
   async function getDailyChart(item, period = 'D') {
     const { market, apiCode } = normalizeItem(item);
-    if (market === 'US') return worldChart(apiCode, period, 'exchangeWorld', 'item');
+    if (market !== 'KR') return worldChart(apiCode, period, 'exchangeWorld', 'item');
     const tf = TIMEFRAME[period] || 'day';
     const now = new Date();
     const start = new Date(now);
@@ -176,9 +178,18 @@
     return rate;
   }
 
+  async function getJpyKrw() {
+    const url = 'https://m.stock.naver.com/front-api/marketIndex/productDetail?category=exchange&reutersCode=FX_JPYKRW';
+    const data = await pJson(url);
+    const r = data.result || {};
+    const per100 = num(r.calcPrice != null ? r.calcPrice : r.closePrice);
+    if (!per100) throw new Error('환율 값을 찾을 수 없습니다.');
+    return per100 / 100; // 1엔당 원
+  }
+
   window.NV = {
     search, getQuote, pollMany, getDailyChart,
-    getIndices, getIndexQuote, getIndexChart, getUsdKrw,
+    getIndices, getIndexQuote, getIndexChart, getUsdKrw, getJpyKrw,
     INDEX_DEFS,
   };
 })();

@@ -4,10 +4,12 @@ const params = new URLSearchParams(location.search);
 const SYMBOL = params.get('symbol');
 const NAME = params.get('name') || SYMBOL;
 const IS_INDEX = params.get('type') === 'index';
-const MARKET = params.get('market') === 'US' ? 'US' : 'KR';
+const MK = params.get('market');
+const MARKET = MK === 'US' || MK === 'JP' ? MK : 'KR';
 const APICODE = params.get('apiCode') || SYMBOL;
 const ITEM = { symbol: SYMBOL, market: MARKET, apiCode: APICODE };
-const DECIMAL = IS_INDEX || MARKET === 'US'; // 지수·미국주식은 소수점 표시
+const NATION = MARKET === 'US' ? '미국' : MARKET === 'JP' ? '일본' : '';
+const DECIMAL = IS_INDEX || MARKET === 'US'; // 지수·미국주식은 소수점 표시 (일본은 정수)
 
 const $ = (s) => document.querySelector(s);
 const fmt = (n) =>
@@ -18,7 +20,7 @@ const cssVar = (name) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 $('#nm').textContent = NAME;
-$('#cd').textContent = IS_INDEX ? '' : MARKET === 'US' ? ` ${SYMBOL} · 미국` : ` ${SYMBOL}`;
+$('#cd').textContent = IS_INDEX ? '' : NATION ? ` ${SYMBOL} · ${NATION}` : ` ${SYMBOL}`;
 document.title = IS_INDEX ? NAME : `${NAME} (${SYMBOL})`;
 
 // 네이버 링크: 종목만 Chrome으로 열기 (지수는 숨김)
@@ -27,7 +29,7 @@ if (IS_INDEX) {
 } else {
   $('#naverLink').addEventListener('click', () => {
     const url =
-      MARKET === 'US'
+      MARKET !== 'KR'
         ? `https://m.stock.naver.com/worldstock/stock/${APICODE}/total`
         : `https://finance.naver.com/item/main.naver?code=${SYMBOL}`;
     window.api.openExternal(url);
@@ -145,18 +147,18 @@ document.querySelectorAll('.period-tabs button').forEach((btn) => {
   });
 });
 
-// ---------------- 환율 (미국 종목 원화 환산) ----------------
-let fxRate = null;
+// ---------------- 환율 (해외 종목 원화 환산) ----------------
+let fxRate = null; // 해당 종목 통화의 1단위당 원
 function updateKrw() {
   const el = $('#krw');
-  if (MARKET === 'US' && fxRate && lastPrice != null) {
+  if (fxRate && MARKET !== 'KR' && lastPrice != null) {
     el.textContent = `≈ ${Math.round(lastPrice * fxRate).toLocaleString('ko-KR')}원`;
   } else {
     el.textContent = '';
   }
 }
 async function loadFx() {
-  const r = await window.api.getUsdKrw();
+  const r = MARKET === 'JP' ? await window.api.getJpyKrw() : await window.api.getUsdKrw();
   if (r.ok) {
     fxRate = r.rate;
     updateKrw();
@@ -222,7 +224,7 @@ window.api.onThemeChange((t) => applyTheme(t));
     : await window.api.getQuote(ITEM);
   if (q.ok) setPrice(q.quote.price, q.quote.change, q.quote.changeRate);
   if (!IS_INDEX) await window.api.subscribe(ITEM);
-  if (MARKET === 'US') {
+  if (MARKET !== 'KR') {
     loadFx();
     setInterval(loadFx, 60000);
   }
